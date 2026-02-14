@@ -1,35 +1,35 @@
 // =====================
 // メインアプリケーションロジック
-// constants.js から定数をimport
-// db.js からFirestoreアクセス関数をimport
+// domain層: 純粋関数（計算・フィルタ）
+// ui/state: 状態管理
+// db.js: Firestoreアクセス
 // =====================
 import { POSITIONS, FIELD_POSITIONS, BATTING_RESULTS, GAME_TYPES, DEFAULT_DATA, WOBA_WEIGHTS } from './constants.js';
 import * as DB from './db.js';
 
-// =====================
-// State
-// =====================
-export let state = {
-    teamId: null,
-    players: [],
-    lineups: [],
-    templates: [],
-    gameStats: [],
-    settings: {
-        teamName: '',
-        defaultManager: '',
-        defaultCoach: ''
-    },
-    currentLineup: null,
-    editingLineupId: null,
-    currentGameStat: null,
-    selectedYear: new Date().getFullYear(),
-    selectedGameType: 'all',
-    statsSortBy: 'woba'
-};
+// domain層からimport（純粋関数）
+import {
+    getGameType, formatAvg, formatPercent,
+    getBattingClass, getBattingLabel, getPositionFit, generateId
+} from './domain/game-utils.js';
+import {
+    filterGames,
+    calculatePlayerStats as calcStats,
+    calculateTeamSummary,
+    getAvailableYears
+} from './domain/game-stats.js';
 
-let reserveCount = 3;
-let confirmCallback = null;
+// state管理からimport
+import {
+    state, confirmCallback, setConfirmCallback,
+    reserveCount, setReserveCount, incrementReserveCount
+} from './ui/state.js';
+
+// domain/ui関数を再export（index.htmlのObject.assign互換維持）
+export { state };
+export { getGameType, formatAvg, formatPercent, getBattingClass, getBattingLabel, getPositionFit, generateId };
+export { filterGames, getAvailableYears, calculateTeamSummary };
+export { calcStats as calculatePlayerStats };
 
 // =====================
 // Firestoreデータ読み込み
@@ -188,13 +188,7 @@ export function renderPlayerList() {
     `).join('');
 }
 
-export function getBattingClass(batting) {
-    return { right: 'badge-right', left: 'badge-left', switch: 'badge-switch' }[batting] || '';
-}
-
-export function getBattingLabel(batting) {
-    return { right: '右打', left: '左打', switch: '両打' }[batting] || '';
-}
+// getBattingClass, getBattingLabel → domain/game-utils.js に移動済み
 
 export function openPlayerModal(playerId = null) {
     const modal = document.getElementById('player-modal');
@@ -397,14 +391,7 @@ export function renderLineupTable() {
     tbody.innerHTML = html;
 }
 
-export function getPositionFit(player, position) {
-    if (!player || !position) return '';
-    position = parseInt(position);
-    if (player.mainPosition === position) return '◎';
-    if (player.subPositions?.includes(position)) return '○';
-    if (position >= 1 && position <= 9) return '△';
-    return '';
-}
+// getPositionFit → domain/game-utils.js に移動済み
 
 export function updateStarterPosition(order, position) {
     if (state.currentLineup) {
@@ -465,7 +452,7 @@ export function updateReserve(index, playerId) {
 }
 
 export function addReserveSlot() {
-    reserveCount++;
+    incrementReserveCount();
     renderReserves();
 }
 
@@ -889,13 +876,13 @@ export function confirmClearData() {
 // =====================
 export function showConfirm(message, callback) {
     document.getElementById('confirm-message').textContent = message;
-    confirmCallback = callback;
+    setConfirmCallback(callback);
     document.getElementById('confirm-modal').classList.add('active');
 }
 
 export function closeConfirmModal() {
     document.getElementById('confirm-modal').classList.remove('active');
-    confirmCallback = null;
+    setConfirmCallback(null);
 }
 
 export function confirmAction() {
@@ -915,23 +902,9 @@ export function renderStatsPage() {
 
 export function updateYearSelector() {
     const select = document.getElementById('stats-year');
-    const years = new Set();
-    const currentYear = new Date().getFullYear();
-
-    // 成績データから年を取得
-    state.gameStats.forEach(g => {
-        const year = new Date(g.date).getFullYear();
-        years.add(year);
-    });
-
-    // 現在の年と過去2年を追加
-    years.add(currentYear);
-    years.add(currentYear - 1);
-    years.add(currentYear - 2);
-
-    const sortedYears = Array.from(years).sort((a, b) => b - a);
-
-    select.innerHTML = sortedYears.map(y =>
+    // domain層のgetAvailableYearsを使用
+    const years = getAvailableYears(state.gameStats);
+    select.innerHTML = years.map(y =>
         `<option value="${y}" ${y === state.selectedYear ? 'selected' : ''}>${y}年</option>`
     ).join('');
 }
@@ -958,29 +931,12 @@ export function switchStatsTab(tab) {
     document.getElementById('stats-players').style.display = tab === 'players' ? 'block' : 'none';
 }
 
-export function getGameType(game) {
-    return game.gameType || 'practice';
-}
+// getGameType → domain/game-utils.js に移動済み
 
 export function renderTeamSummary() {
     const container = document.getElementById('team-summary-container');
-    const yearGames = state.gameStats.filter(g => new Date(g.date).getFullYear() === state.selectedYear);
-
-    const types = Object.keys(GAME_TYPES);
-    const summaries = types.map(type => {
-        const games = yearGames.filter(g => getGameType(g) === type);
-        let wins = 0, losses = 0, draws = 0, scored = 0, conceded = 0;
-        games.forEach(g => {
-            const our = g.ourScore || 0, opp = g.opponentScore || 0;
-            scored += our; conceded += opp;
-            if (our > opp) wins++;
-            else if (our < opp) losses++;
-            else draws++;
-        });
-        const count = games.length;
-        const winRate = count > 0 ? ((wins + 0.5 * draws) / count) : null;
-        return { type, label: GAME_TYPES[type].label, count, wins, losses, draws, scored, conceded, diff: scored - conceded, winRate };
-    });
+    // domain層の集計関数を使用
+    const summaries = calculateTeamSummary(state.gameStats, { year: state.selectedYear });
 
     container.innerHTML = `
         <div class="card" style="padding: 12px;">
@@ -1012,11 +968,10 @@ export function renderGameStatsList() {
     const container = document.getElementById('game-stats-list');
     const empty = document.getElementById('game-stats-empty');
 
-    const filtered = state.gameStats.filter(g => {
-        const year = new Date(g.date).getFullYear();
-        if (year !== state.selectedYear) return false;
-        if (state.selectedGameType !== 'all' && getGameType(g) !== state.selectedGameType) return false;
-        return true;
+    // domain層のfilterGamesを使用
+    const filtered = filterGames(state.gameStats, {
+        year: state.selectedYear,
+        type: state.selectedGameType
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (filtered.length === 0) {
@@ -1521,19 +1476,54 @@ export async function saveGameStat() {
 
     try {
         if (editId) {
-            // Firestore更新
-            const { id, createdAt, ...statData } = state.currentGameStat;
-            await DB.updateGameStat(state.teamId, editId, statData);
+            // 競合チェック（楽観的ロック）
+            const clientUpdatedAt = state.currentGameStat.meta?.updatedAt;
+            if (clientUpdatedAt) {
+                const { conflict, serverData } = await DB.checkConflict(
+                    state.teamId, 'gameStats', editId, clientUpdatedAt
+                );
+                if (conflict) {
+                    const overwrite = confirm(
+                        '他のユーザーがこのデータを更新しています。\n' +
+                        '上書きしますか？（キャンセルで最新データを再読込）'
+                    );
+                    if (!overwrite) {
+                        // サーバーデータで上書き
+                        const idx = state.gameStats.findIndex(g => g.id === editId);
+                        if (idx >= 0 && serverData) {
+                            state.gameStats[idx] = serverData;
+                        }
+                        closeGameStatModal();
+                        renderStatsPage();
+                        renderSavedList();
+                        return;
+                    }
+                }
+            }
+
+            // Firestore更新（meta付き）
+            const { id, createdAt, meta, ...statData } = state.currentGameStat;
+            const currentVersion = meta?.version || 0;
+            const result = await DB.updateGameStatWithMeta(state.teamId, editId, statData, currentVersion);
             const idx = state.gameStats.findIndex(g => g.id === editId);
             if (idx >= 0) {
-                state.gameStats[idx] = { ...state.currentGameStat, id: editId };
+                state.gameStats[idx] = {
+                    ...state.currentGameStat,
+                    id: editId,
+                    meta: { version: result.version, updatedAt: result.updatedAt }
+                };
             }
         } else {
-            // Firestore新規作成
-            const { id, createdAt, ...statData } = state.currentGameStat;
-            const newId = await DB.addGameStat(state.teamId, statData);
-            state.currentGameStat.id = newId;
-            state.gameStats.push({ ...state.currentGameStat, id: newId });
+            // Firestore新規作成（meta付き）
+            const { id, createdAt, meta, ...statData } = state.currentGameStat;
+            const result = await DB.addGameStatWithMeta(state.teamId, statData);
+            state.currentGameStat.id = result.id;
+            state.currentGameStat.meta = { version: result.version, updatedAt: result.updatedAt };
+            state.gameStats.push({
+                ...state.currentGameStat,
+                id: result.id,
+                meta: { version: result.version, updatedAt: result.updatedAt }
+            });
         }
 
         closeGameStatModal();
@@ -1576,109 +1566,6 @@ export function deleteGameStat() {
     });
 }
 
-// =====================
-// Player Stats Calculation
-// =====================
-export function calculatePlayerStats(playerId, year, gameType) {
-    const games = state.gameStats.filter(g => {
-        const gameYear = new Date(g.date).getFullYear();
-        if (gameYear !== year || !g.playerStats || !g.playerStats[playerId]) return false;
-        if (gameType && gameType !== 'all' && getGameType(g) !== gameType) return false;
-        return true;
-    });
-
-    let stats = {
-        games: 0,
-        atBats: 0,
-        hits: 0,
-        singles: 0,
-        doubles: 0,
-        triples: 0,
-        homeRuns: 0,
-        rbi: 0,
-        walks: 0,
-        hitByPitch: 0,
-        strikeouts: 0,
-        sacrifices: 0,
-        sacrificeFlies: 0,
-        totalBases: 0
-    };
-
-    games.forEach(game => {
-        const ps = game.playerStats[playerId];
-        if (!ps || !ps.atBats) return;
-
-        const validAtBats = ps.atBats.filter(ab => ab);
-        if (validAtBats.length === 0) return;
-
-        stats.games++;
-        stats.rbi += ps.rbi || 0;
-
-        validAtBats.forEach(result => {
-            const def = BATTING_RESULTS[result];
-            if (!def) return;
-
-            if (def.isAtBat) stats.atBats++;
-            if (def.isHit) stats.hits++;
-            stats.totalBases += def.totalBases;
-
-            switch (result) {
-                case 'single': stats.singles++; break;
-                case 'double': stats.doubles++; break;
-                case 'triple': stats.triples++; break;
-                case 'homerun': stats.homeRuns++; break;
-                case 'walk': stats.walks++; break;
-                case 'hitByPitch': stats.hitByPitch++; break;
-                case 'strikeout': stats.strikeouts++; break;
-                case 'sacrifice': stats.sacrifices++; break;
-                case 'sacrificeFly': stats.sacrificeFlies++; break;
-            }
-        });
-    });
-
-    // 基本指標の計算
-    stats.avg = stats.atBats > 0 ? stats.hits / stats.atBats : 0;
-    stats.slg = stats.atBats > 0 ? stats.totalBases / stats.atBats : 0;
-
-    const obpDenom = stats.atBats + stats.walks + stats.hitByPitch + stats.sacrificeFlies;
-    stats.obp = obpDenom > 0 ? (stats.hits + stats.walks + stats.hitByPitch) / obpDenom : 0;
-
-    stats.ops = stats.obp + stats.slg;
-
-    // 打席数（PA = 打数 + 四球 + 死球 + 犠飛 + 犠打）
-    stats.pa = stats.atBats + stats.walks + stats.hitByPitch + stats.sacrificeFlies + stats.sacrifices;
-
-    // wOBA（重み付け出塁率）
-    const wobaDenom = stats.atBats + stats.walks + stats.hitByPitch + stats.sacrificeFlies;
-    if (wobaDenom > 0) {
-        stats.woba = (
-            WOBA_WEIGHTS.bb * stats.walks +
-            WOBA_WEIGHTS.hbp * stats.hitByPitch +
-            WOBA_WEIGHTS.single * stats.singles +
-            WOBA_WEIGHTS.double * stats.doubles +
-            WOBA_WEIGHTS.triple * stats.triples +
-            WOBA_WEIGHTS.homerun * stats.homeRuns
-        ) / wobaDenom;
-    } else {
-        stats.woba = 0;
-    }
-
-    // ISO（純粋長打力 = 長打率 - 打率）
-    stats.iso = stats.slg - stats.avg;
-
-    // BABIP（インプレー打率）= (安打 - 本塁打) / (打数 - 三振 - 本塁打 + 犠飛)
-    const babipDenom = stats.atBats - stats.strikeouts - stats.homeRuns + stats.sacrificeFlies;
-    stats.babip = babipDenom > 0 ? (stats.hits - stats.homeRuns) / babipDenom : 0;
-
-    // K%（三振率）= 三振 / 打席数
-    stats.kRate = stats.pa > 0 ? stats.strikeouts / stats.pa : 0;
-
-    // BB%（四球率）= 四球 / 打席数
-    stats.bbRate = stats.pa > 0 ? stats.walks / stats.pa : 0;
-
-    return stats;
-}
-
 // 選手成績のソート基準を変更
 export function changeStatsSortBy(sortBy) {
     state.statsSortBy = sortBy;
@@ -1693,7 +1580,7 @@ export function renderPlayerStats() {
     const sortKey = state.statsSortBy || 'woba';
     const playerStats = activePlayers.map(player => ({
         player,
-        stats: calculatePlayerStats(player.id, state.selectedYear, state.selectedGameType)
+        stats: calcStats(state.gameStats, player.id, { year: state.selectedYear, type: state.selectedGameType })
     })).filter(ps => ps.stats.games > 0)
       .sort((a, b) => b.stats[sortKey] - a.stats[sortKey]);
 
@@ -1743,22 +1630,11 @@ export function renderPlayerStats() {
     }).join('');
 }
 
-export function formatAvg(value) {
-    if (value === 0) return '.000';
-    if (value >= 1) return value.toFixed(3);
-    return value.toFixed(3).substring(1);
-}
-
-// パーセント表示フォーマッタ（K%, BB%用）
-export function formatPercent(value) {
-    return (value * 100).toFixed(1) + '%';
-}
-
 export function showPlayerStatDetail(playerId) {
     const player = state.players.find(p => p.id === playerId);
     if (!player) return;
 
-    const stats = calculatePlayerStats(playerId, state.selectedYear, state.selectedGameType);
+    const stats = calcStats(state.gameStats, playerId, { year: state.selectedYear, type: state.selectedGameType });
     const modal = document.getElementById('player-stat-modal');
     const title = document.getElementById('player-stat-modal-title');
     const body = document.getElementById('player-stat-modal-body');
@@ -1815,13 +1691,6 @@ export function showPlayerStatDetail(playerId) {
 
 export function closePlayerStatModal() {
     document.getElementById('player-stat-modal').classList.remove('active');
-}
-
-// =====================
-// Utilities
-// =====================
-export function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
 // =====================

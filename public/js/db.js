@@ -147,6 +147,80 @@ export async function updateTeamSettings(teamId, settings) {
 }
 
 // =====================
+// meta付き試合成績操作（楽観的ロック対応）
+// =====================
+
+/**
+ * meta付きで試合成績を追加
+ * @param {string} teamId
+ * @param {Object} statData - 試合データ
+ * @returns {Object} { id, version, updatedAt }
+ */
+export async function addGameStatWithMeta(teamId, statData) {
+    const now = new Date().toISOString();
+    const ref = collection(db, 'teams', teamId, 'gameStats');
+    const docRef = await addDoc(ref, {
+        ...statData,
+        meta: { version: 1, updatedAt: now },
+        createdAt: serverTimestamp()
+    });
+    return { id: docRef.id, version: 1, updatedAt: now };
+}
+
+/**
+ * meta付きで試合成績を更新（versionをインクリメント）
+ * @param {string} teamId
+ * @param {string} statId - ドキュメントID
+ * @param {Object} statData - 更新データ
+ * @param {number} currentVersion - クライアント側の現在のバージョン
+ * @returns {Object} { version, updatedAt }
+ */
+export async function updateGameStatWithMeta(teamId, statId, statData, currentVersion) {
+    const now = new Date().toISOString();
+    const newVersion = (currentVersion || 0) + 1;
+    const ref = doc(db, 'teams', teamId, 'gameStats', statId);
+    await updateDoc(ref, {
+        ...statData,
+        meta: { version: newVersion, updatedAt: now }
+    });
+    return { version: newVersion, updatedAt: now };
+}
+
+/**
+ * 楽観的ロック: 競合を検出
+ * サーバーのmeta.updatedAtがクライアントより新しい場合はconflict
+ *
+ * @param {string} teamId
+ * @param {string} collectionName - 'gameStats' | 'lineups' 等
+ * @param {string} docId - ドキュメントID
+ * @param {string} clientUpdatedAt - クライアント側の最終更新日時（ISO文字列）
+ * @returns {Object} { conflict: boolean, serverData?: Object }
+ */
+export async function checkConflict(teamId, collectionName, docId, clientUpdatedAt) {
+    const ref = doc(db, 'teams', teamId, collectionName, docId);
+    const snapshot = await getDoc(ref);
+
+    if (!snapshot.exists()) {
+        return { conflict: false };
+    }
+
+    const serverData = { id: snapshot.id, ...snapshot.data() };
+    const serverUpdatedAt = serverData.meta?.updatedAt;
+
+    // サーバーにmeta情報がない場合（旧データ）は競合なし
+    if (!serverUpdatedAt || !clientUpdatedAt) {
+        return { conflict: false };
+    }
+
+    // サーバーの更新日時がクライアントより新しい場合は競合
+    if (serverUpdatedAt > clientUpdatedAt) {
+        return { conflict: true, serverData };
+    }
+
+    return { conflict: false };
+}
+
+// =====================
 // 全データ一括読み込み（init用）
 // =====================
 export async function loadAllData(teamId) {

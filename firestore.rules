@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ユーザープロファイル（所属チーム一覧を含む）
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ユーザーがチームメンバーであることを確認するヘルパー
+    function isTeamMember(teamId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+    }
+
+    // ユーザーがチームのadminであることを確認するヘルパー
+    function isTeamAdmin(teamId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role == "admin";
+    }
+
+    match /teams/{teamId} {
+      // チーム情報: メンバーは読み取り可、adminのみ書き込み可
+      // 新規作成時は認証ユーザーなら誰でもOK（チーム作成フロー用）
+      match /info/{document=**} {
+        allow read: if isTeamMember(teamId);
+        allow create: if request.auth != null;
+        allow update, delete: if isTeamAdmin(teamId);
+      }
+
+      // メンバー管理: メンバーは一覧読み取り可、adminのみ追加・削除可
+      // 自分自身のメンバードキュメント作成は認証ユーザーなら許可（チーム作成・参加フロー用）
+      match /members/{userId} {
+        allow read: if isTeamMember(teamId);
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update: if isTeamAdmin(teamId);
+        allow delete: if isTeamAdmin(teamId);
+      }
+
+      // 選手データ: メンバーは読み取り可、adminのみ書き込み可
+      match /players/{playerId} {
+        allow read: if isTeamMember(teamId);
+        allow write: if isTeamAdmin(teamId);
+      }
+
+      // メンバー表: メンバーは読み取り可、adminのみ書き込み可
+      match /lineups/{lineupId} {
+        allow read: if isTeamMember(teamId);
+        allow write: if isTeamAdmin(teamId);
+      }
+
+      // 試合成績: メンバーは読み取り可、adminのみ書き込み可
+      match /gameStats/{statId} {
+        allow read: if isTeamMember(teamId);
+        allow write: if isTeamAdmin(teamId);
+      }
+
+      // 出欠管理: メンバーは読み取り可、adminはイベント作成可
+      match /events/{eventId} {
+        allow read: if isTeamMember(teamId);
+        allow write: if isTeamAdmin(teamId);
+
+        // 出欠回答: 本人のみ書き込み可
+        match /attendances/{userId} {
+          allow read: if isTeamMember(teamId);
+          allow write: if request.auth.uid == userId;
+        }
+      }
+
+      // 会計: メンバーは読み取り可、adminのみ書き込み可
+      match /accounting/{document=**} {
+        allow read: if isTeamMember(teamId);
+        allow write: if isTeamAdmin(teamId);
+      }
+    }
+
+    // 招待トークン（チーム参加用）
+    match /invites/{inviteId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+  }
+}

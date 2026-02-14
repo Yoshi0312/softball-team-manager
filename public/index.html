@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ソフトボール メンバー表管理</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1 id="page-title">ホーム</h1>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="header-team-switch" onclick="switchTeam()" title="チーム切替" style="font-size: 11px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 12px; padding: 2px 10px; cursor: pointer; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis;"></button>
+            <span id="header-user-name" style="font-size: 12px; opacity: 0.8;"></span>
+            <button class="header-btn" onclick="openSettings()" title="設定">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+            </button>
+            <button class="header-btn" onclick="logout()" title="ログアウト">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Home Page -->
+    <div id="page-home" class="page active">
+        <div class="card">
+            <h2 class="card-title">クイックアクション</h2>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn btn-primary btn-block" onclick="showPage('lineup'); startNewLineup();">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    新規メンバー表作成
+                </button>
+                <button class="btn btn-secondary btn-block" onclick="showPage('saved')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    保存済みを開く
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">登録選手</h2>
+            <div id="home-player-summary">
+                <p class="text-muted">選手を登録してください</p>
+            </div>
+            <button class="btn btn-secondary btn-block mt-4" onclick="showPage('players')">
+                選手一覧を見る
+            </button>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">最近のメンバー表</h2>
+            <div id="home-recent-lineups">
+                <p class="text-muted">保存されたメンバー表はありません</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Players Page -->
+    <div id="page-players" class="page">
+        <div id="player-list-container">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h2 class="card-title" style="margin: 0;">選手一覧</h2>
+                    <select id="player-sort" class="form-control" style="width: auto; padding: 8px 32px 8px 12px;" onchange="renderPlayerList()">
+                        <option value="number">背番号順</option>
+                        <option value="name">名前順</option>
+                        <option value="position">ポジション順</option>
+                    </select>
+                </div>
+                <ul class="player-list" id="player-list">
+                    <!-- Players will be rendered here -->
+                </ul>
+                <div id="player-empty" class="empty-state" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <p>登録された選手がいません</p>
+                    <button class="btn btn-primary mt-4" onclick="openPlayerModal()">選手を登録</button>
+                </div>
+            </div>
+        </div>
+        <button class="fab" onclick="openPlayerModal()" title="選手を追加" data-role="admin">+</button>
+    </div>
+
+    <!-- Lineup Page -->
+    <div id="page-lineup" class="page">
+        <div class="card">
+            <h2 class="card-title">試合情報</h2>
+            <div class="form-group">
+                <label class="form-label">大会名<span class="required">*</span></label>
+                <input type="text" id="lineup-tournament" class="form-control" placeholder="例: 春季大会">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">試合日<span class="required">*</span></label>
+                    <input type="date" id="lineup-date" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">自チーム</label>
+                    <input type="text" id="lineup-team" class="form-control" placeholder="チーム名">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">相手チーム</label>
+                    <input type="text" id="lineup-opponent" class="form-control" placeholder="対戦相手">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <input type="checkbox" id="lineup-use-dp" onchange="toggleDPRows()"> DP制を使用
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">スターティングメンバー</h2>
+            <div style="overflow-x: auto;">
+                <table class="lineup-table">
+                    <thead>
+                        <tr>
+                            <th>打順</th>
+                            <th>守備</th>
+                            <th>選手名</th>
+                            <th>背番号</th>
+                            <th>打</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lineup-starters">
+                        <!-- Lineup rows will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted mt-2" style="font-size: 12px;">
+                黄色: 左打 / 緑: 両打 / ◎: メインポジション / ○: サブポジション
+            </p>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">控え選手</h2>
+            <div id="lineup-reserves">
+                <!-- Reserve players will be rendered here -->
+            </div>
+            <button class="btn btn-secondary btn-sm mt-2" onclick="addReserveSlot()">+ 控え選手を追加</button>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">スタッフ</h2>
+            <div class="form-group">
+                <label class="form-label">監督</label>
+                <input type="text" id="lineup-manager" class="form-control" placeholder="監督名">
+            </div>
+            <div class="form-group">
+                <label class="form-label">コーチ</label>
+                <input type="text" id="lineup-coach" class="form-control" placeholder="コーチ名">
+            </div>
+            <div class="form-group">
+                <label class="form-label">スコアラー</label>
+                <input type="text" id="lineup-scorer" class="form-control" placeholder="スコアラー名">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="previewLineup()">プレビュー</button>
+            <button class="btn btn-primary" style="flex: 1;" onclick="saveLineup()">保存</button>
+        </div>
+        <button class="btn btn-secondary btn-block" onclick="saveAsTemplate()">テンプレートとして保存</button>
+    </div>
+
+    <!-- Preview Page -->
+    <div id="page-preview" class="page">
+        <div class="tabs">
+            <div class="tab active" onclick="switchPreviewTab('table')">メンバー表</div>
+            <div class="tab" onclick="switchPreviewTab('field')">守備位置図</div>
+        </div>
+
+        <div id="preview-table" class="card">
+            <div class="preview-header">
+                <div class="preview-title" id="preview-tournament"></div>
+                <div id="preview-date"></div>
+                <div class="preview-teams">
+                    <span id="preview-team"></span>
+                    <span>vs</span>
+                    <span id="preview-opponent"></span>
+                </div>
+            </div>
+            <table class="lineup-table" id="preview-lineup-table">
+                <thead>
+                    <tr>
+                        <th>打順</th>
+                        <th>守備</th>
+                        <th>選手名</th>
+                        <th>背番号</th>
+                    </tr>
+                </thead>
+                <tbody id="preview-lineup-body">
+                </tbody>
+            </table>
+            <div class="mt-4">
+                <h4 style="font-size: 14px; margin-bottom: 8px;">控え選手</h4>
+                <div id="preview-reserves"></div>
+            </div>
+            <div class="mt-4">
+                <p style="font-size: 13px;"><strong>監督:</strong> <span id="preview-manager"></span></p>
+                <p style="font-size: 13px;"><strong>コーチ:</strong> <span id="preview-coach"></span></p>
+            </div>
+        </div>
+
+        <div id="preview-field" class="card" style="display: none;">
+            <div class="field-container">
+                <svg class="field-svg" viewBox="0 0 400 400" id="field-svg">
+                    <!-- Field background -->
+                    <defs>
+                        <linearGradient id="grass" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#4caf50"/>
+                            <stop offset="100%" style="stop-color:#388e3c"/>
+                        </linearGradient>
+                        <linearGradient id="dirt" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#d7a86e"/>
+                            <stop offset="100%" style="stop-color:#c49a6c"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Outfield grass -->
+                    <path d="M 200 380 L 20 200 A 250 250 0 0 1 380 200 Z" fill="url(#grass)"/>
+
+                    <!-- Infield dirt -->
+                    <path d="M 200 320 L 120 240 L 200 160 L 280 240 Z" fill="url(#dirt)"/>
+
+                    <!-- Base paths -->
+                    <line x1="200" y1="320" x2="120" y2="240" stroke="white" stroke-width="2"/>
+                    <line x1="120" y1="240" x2="200" y2="160" stroke="white" stroke-width="2"/>
+                    <line x1="200" y1="160" x2="280" y2="240" stroke="white" stroke-width="2"/>
+                    <line x1="280" y1="240" x2="200" y2="320" stroke="white" stroke-width="2"/>
+
+                    <!-- Bases -->
+                    <rect x="192" y="312" width="16" height="16" fill="white" transform="rotate(45 200 320)"/>
+                    <rect x="112" y="232" width="16" height="16" fill="white" transform="rotate(45 120 240)"/>
+                    <rect x="192" y="152" width="16" height="16" fill="white" transform="rotate(45 200 160)"/>
+                    <rect x="272" y="232" width="16" height="16" fill="white" transform="rotate(45 280 240)"/>
+
+                    <!-- Pitcher's circle -->
+                    <circle cx="200" cy="250" r="12" fill="url(#dirt)" stroke="white" stroke-width="1"/>
+
+                    <!-- Player positions will be added dynamically -->
+                    <g id="field-players"></g>
+                </svg>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="showPage('lineup')">編集に戻る</button>
+            <button class="btn btn-primary" style="flex: 1;" onclick="downloadAsImage()">画像で保存</button>
+        </div>
+    </div>
+
+    <!-- Saved Lineups Page -->
+    <div id="page-saved" class="page">
+        <div class="tabs">
+            <div class="tab active" onclick="switchSavedTab('lineups')">メンバー表</div>
+            <div class="tab" onclick="switchSavedTab('templates')">テンプレート</div>
+        </div>
+
+        <div id="saved-lineups" class="card">
+            <div id="saved-lineups-list">
+                <!-- Saved lineups will be rendered here -->
+            </div>
+            <div id="saved-lineups-empty" class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <p>保存されたメンバー表はありません</p>
+            </div>
+        </div>
+
+        <div id="saved-templates" class="card" style="display: none;">
+            <div id="saved-templates-list">
+                <!-- Templates will be rendered here -->
+            </div>
+            <div id="saved-templates-empty" class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="3" y1="9" x2="21" y2="9"/>
+                    <line x1="9" y1="21" x2="9" y2="9"/>
+                </svg>
+                <p>テンプレートはありません</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Page -->
+    <div id="page-stats" class="page">
+        <div class="tabs">
+            <div class="tab active" onclick="switchStatsTab('games')">試合成績</div>
+            <div class="tab" onclick="switchStatsTab('players')">選手別統計</div>
+        </div>
+
+        <!-- Year Selector -->
+        <div class="card" style="padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <label style="font-weight: 500;">年度:</label>
+                <select id="stats-year" class="form-control" style="width: auto; flex: 1;" onchange="changeStatsYear(this.value)">
+                </select>
+                <label style="font-weight: 500;">種別:</label>
+                <select id="stats-game-type" class="form-control" style="width: auto; flex: 1;" onchange="changeStatsGameType(this.value)">
+                    <option value="all">全て</option>
+                    <option value="official">公式戦（一般）</option>
+                    <option value="official_senior">公式戦（壮年）</option>
+                    <option value="practice">練習試合</option>
+                    <option value="intrasquad">紅白戦</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Team Summary -->
+        <div id="team-summary-container"></div>
+
+        <!-- Games List -->
+        <div id="stats-games">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h2 class="card-title" style="margin: 0;">試合一覧</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openLineupSelectModal()" data-role="admin">+ 成績入力</button>
+                </div>
+                <div id="game-stats-list">
+                    <!-- Game stats will be rendered here -->
+                </div>
+                <div id="game-stats-empty" class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <p>成績データがありません</p>
+                    <p class="text-muted mt-2" style="font-size: 13px;">「保存済み」からメンバー表を選んで<br>成績を入力してください</p>
+                    <button class="btn btn-primary mt-4" onclick="openLineupSelectModal()">メンバー表から入力</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Stats -->
+        <div id="stats-players" style="display: none;">
+            <div class="card">
+                <h2 class="card-title">打撃成績一覧</h2>
+                <div style="overflow-x: auto;">
+                    <table class="stats-table" id="player-stats-table">
+                        <thead>
+                            <tr>
+                                <th>選手</th>
+                                <th>試</th>
+                                <th>打数</th>
+                                <th>安打</th>
+                                <th>打率</th>
+                                <th>出塁</th>
+                                <th>長打</th>
+                                <th>OPS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-stats-body">
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted mt-2" style="font-size: 11px;">
+                    試=試合数 / 出塁=出塁率 / 長打=長打率
+                </p>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">詳細成績</h2>
+                <div style="overflow-x: auto;">
+                    <table class="stats-table" id="player-detail-table">
+                        <thead>
+                            <tr>
+                                <th>選手</th>
+                                <th>2塁打</th>
+                                <th>3塁打</th>
+                                <th>本塁打</th>
+                                <th>打点</th>
+                                <th>四球</th>
+                                <th>三振</th>
+                                <th>犠打</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-detail-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Stat Modal -->
+    <div id="game-stat-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 600px; max-height: 95vh;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="game-stat-modal-title">成績入力</h3>
+                <button class="modal-close" onclick="closeGameStatModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: calc(95vh - 130px); overflow-y: auto;">
+                <input type="hidden" id="game-stat-edit-id">
+
+                <!-- 試合情報 -->
+                <div class="card" style="margin-bottom: 12px; padding: 12px; background: var(--gray-light);">
+                    <h4 style="font-size: 14px; margin-bottom: 12px;">試合情報</h4>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">試合日<span class="required">*</span></label>
+                            <input type="date" id="game-stat-date" class="form-control">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">試合種別</label>
+                            <select id="game-stat-game-type" class="form-control">
+                                <option value="official">公式戦（一般）</option>
+                                <option value="official_senior">公式戦（壮年）</option>
+                                <option value="practice">練習試合</option>
+                                <option value="intrasquad">紅白戦</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">先攻/後攻</label>
+                            <select id="game-stat-batting-order" class="form-control" onchange="updateBattingOrder(this.value); renderInningScoreTable();">
+                                <option value="home">後攻（ホーム）</option>
+                                <option value="away">先攻（ビジター）</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">大会名</label>
+                            <input type="text" id="game-stat-tournament" class="form-control" placeholder="例: 春季大会">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">相手チーム</label>
+                            <input type="text" id="game-stat-opponent" class="form-control" placeholder="対戦相手">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- イニングスコア -->
+                <div class="card" style="margin-bottom: 12px; padding: 12px; background: var(--gray-light);">
+                    <h4 style="font-size: 14px; margin-bottom: 12px;">イニングスコア</h4>
+                    <div style="overflow-x: auto;">
+                        <table class="inning-score-table" style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 60px; padding: 4px; border: 1px solid var(--border);"></th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">1</th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">2</th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">3</th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">4</th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">5</th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">6</th>
+                                    <th style="padding: 4px; border: 1px solid var(--border);">7</th>
+                                    <th style="width: 40px; padding: 4px; border: 1px solid var(--border); font-weight: 600;">計</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inning-score-tbody">
+                                <!-- Dynamic content rendered by renderInningScoreTable() -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 投手成績 -->
+                <div class="card" style="margin-bottom: 12px; padding: 12px; background: var(--gray-light);">
+                    <h4 style="font-size: 14px; margin-bottom: 12px;">投手成績</h4>
+                    <div id="pitcher-stats-inputs">
+                        <!-- Pitcher inputs will be rendered here -->
+                    </div>
+                    <button class="btn btn-secondary btn-sm mt-2" onclick="addPitcherEntry()">+ 投手を追加</button>
+                </div>
+
+                <!-- 打撃成績 -->
+                <h4 style="margin: 16px 0 12px; font-size: 15px;">打撃成績</h4>
+                <p style="font-size: 11px; color: var(--gray); margin-bottom: 8px;">得点=得点 / 盗=盗塁</p>
+                <div id="player-batting-inputs">
+                    <!-- Player batting inputs will be rendered here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGameStatModal()">キャンセル</button>
+                <button class="btn btn-danger" id="game-stat-delete-btn" style="display: none;" onclick="deleteGameStat()">削除</button>
+                <button class="btn btn-primary" onclick="saveGameStat()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Stat Detail Modal -->
+    <div id="player-stat-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="player-stat-modal-title">選手成績詳細</h3>
+                <button class="modal-close" onclick="closePlayerStatModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="player-stat-modal-body">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closePlayerStatModal()">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lineup Select Modal -->
+    <div id="lineup-select-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">メンバー表を選択</h3>
+                <button class="modal-close" onclick="closeLineupSelectModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-4" style="font-size: 13px;">成績を入力するメンバー表を選んでください</p>
+                <div id="lineup-select-list">
+                    <!-- Lineup list will be rendered here -->
+                </div>
+                <div id="lineup-select-empty" class="empty-state" style="padding: 20px;">
+                    <p>保存されたメンバー表がありません</p>
+                    <button class="btn btn-secondary mt-2" onclick="closeLineupSelectModal(); showPage('lineup');">メンバー表を作成</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="page-settings" class="page">
+        <div class="card">
+            <h2 class="card-title">チーム設定</h2>
+            <div class="form-group">
+                <label class="form-label">チーム名</label>
+                <input type="text" id="settings-team-name" class="form-control" placeholder="チーム名を入力">
+            </div>
+            <div class="form-group">
+                <label class="form-label">監督名（デフォルト）</label>
+                <input type="text" id="settings-manager" class="form-control" placeholder="監督名">
+            </div>
+            <div class="form-group">
+                <label class="form-label">コーチ名（デフォルト）</label>
+                <input type="text" id="settings-coach" class="form-control" placeholder="コーチ名">
+            </div>
+            <button class="btn btn-primary btn-block" onclick="saveSettings()">設定を保存</button>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">データ管理</h2>
+            <button class="btn btn-secondary btn-block mb-2" onclick="exportData()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                データをエクスポート
+            </button>
+            <button class="btn btn-secondary btn-block mb-2" onclick="document.getElementById('import-file').click()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                データをインポート
+            </button>
+            <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importData(event)">
+            <button class="btn btn-danger btn-block" onclick="confirmClearData()" data-role="admin">
+                全データを削除
+            </button>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">アプリ情報</h2>
+            <p style="font-size: 14px; color: var(--gray);">
+                ソフトボール メンバー表管理<br>
+                バージョン 1.0.0
+            </p>
+        </div>
+    </div>
+
+    <!-- Player Modal -->
+    <div id="player-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="player-modal-title">選手登録</h3>
+                <button class="modal-close" onclick="closePlayerModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="player-edit-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">選手名<span class="required">*</span></label>
+                        <input type="text" id="player-name" class="form-control" placeholder="山田 太郎">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 80px;">
+                        <label class="form-label">背番号<span class="required">*</span></label>
+                        <input type="number" id="player-number" class="form-control" min="0" max="99" placeholder="10">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">打席<span class="required">*</span></label>
+                        <select id="player-batting" class="form-control">
+                            <option value="right">右打</option>
+                            <option value="left">左打</option>
+                            <option value="switch">両打</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">投げ<span class="required">*</span></label>
+                        <select id="player-throwing" class="form-control">
+                            <option value="right">右投</option>
+                            <option value="left">左投</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">メインポジション<span class="required">*</span></label>
+                    <select id="player-main-position" class="form-control">
+                        <option value="">選択してください</option>
+                        <option value="1">1: 投手(P)</option>
+                        <option value="2">2: 捕手(C)</option>
+                        <option value="3">3: 一塁手(1B)</option>
+                        <option value="4">4: 二塁手(2B)</option>
+                        <option value="5">5: 三塁手(3B)</option>
+                        <option value="6">6: 遊撃手(SS)</option>
+                        <option value="7">7: 左翼手(LF)</option>
+                        <option value="8">8: 中堅手(CF)</option>
+                        <option value="9">9: 右翼手(RF)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">サブポジション</label>
+                    <div class="checkbox-group" id="player-sub-positions">
+                        <label class="checkbox-item"><input type="checkbox" value="1"> P</label>
+                        <label class="checkbox-item"><input type="checkbox" value="2"> C</label>
+                        <label class="checkbox-item"><input type="checkbox" value="3"> 1B</label>
+                        <label class="checkbox-item"><input type="checkbox" value="4"> 2B</label>
+                        <label class="checkbox-item"><input type="checkbox" value="5"> 3B</label>
+                        <label class="checkbox-item"><input type="checkbox" value="6"> SS</label>
+                        <label class="checkbox-item"><input type="checkbox" value="7"> LF</label>
+                        <label class="checkbox-item"><input type="checkbox" value="8"> CF</label>
+                        <label class="checkbox-item"><input type="checkbox" value="9"> RF</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">学年/年齢</label>
+                    <input type="text" id="player-grade" class="form-control" placeholder="例: 3年">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">備考</label>
+                    <textarea id="player-note" class="form-control" rows="2" placeholder="特記事項があれば入力"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">登録状態</label>
+                    <select id="player-status" class="form-control">
+                        <option value="active">有効</option>
+                        <option value="休部">休部</option>
+                        <option value="退部">退部</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePlayerModal()">キャンセル</button>
+                <button class="btn btn-danger" id="player-delete-btn" style="display: none;" onclick="deletePlayer()">削除</button>
+                <button class="btn btn-primary" onclick="savePlayer()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 340px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="confirm-title">確認</h3>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">キャンセル</button>
+                <button class="btn btn-danger" id="confirm-btn" onclick="confirmAction()">削除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a class="nav-item active" onclick="showPage('home')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            ホーム
+        </a>
+        <a class="nav-item" onclick="showPage('players')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+            </svg>
+            選手
+        </a>
+        <a class="nav-item" onclick="showPage('lineup')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            作成
+        </a>
+        <a class="nav-item" onclick="showPage('stats')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            成績
+        </a>
+        <a class="nav-item" onclick="showPage('saved')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+            </svg>
+            保存
+        </a>
+    </nav>
+
+    <!-- モジュールインポート & グローバル公開 -->
+    <!-- LocalStorage移行バナー -->
+    <div id="migration-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999; background:#fff3cd; border-bottom:2px solid #ffc107; padding:12px 16px;">
+        <div style="max-width:600px; margin:0 auto;">
+            <p style="margin:0 0 8px; font-weight:bold; color:#856404;">📦 旧データの移行</p>
+            <p id="migration-summary" style="margin:0 0 12px; font-size:13px; color:#856404;"></p>
+            <div style="display:flex; gap:8px;">
+                <button id="migration-start-btn" onclick="startMigration()" style="padding:8px 20px; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">移行する</button>
+                <button onclick="dismissMigration()" style="padding:8px 20px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">スキップ</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import './js/firebase-init.js';
+        import { auth } from './js/firebase-init.js';
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
+        import * as authModule from './js/auth.js';
+        import * as appModule from './js/app.js';
+        import { hasLocalStorageData, isMigrated, getLocalStorageSummary, migrateLocalStorageToFirestore } from './js/migration.js';
+
+        // ES Modules の関数を window に公開（inline onclick から呼べるようにする）
+        Object.assign(window, appModule, authModule);
+
+        // 移行バナーの操作をwindowに公開
+        let _currentTeamId = null;
+
+        window.startMigration = async function() {
+            const btn = document.getElementById('migration-start-btn');
+            btn.disabled = true;
+            btn.textContent = '移行中...';
+            try {
+                const result = await migrateLocalStorageToFirestore(_currentTeamId);
+                if (result.migrated) {
+                    alert(`移行完了！\n選手: ${result.counts.players}件\nメンバー表: ${result.counts.lineups}件\nテンプレート: ${result.counts.templates}件\n試合成績: ${result.counts.gameStats}件`);
+                    document.getElementById('migration-banner').style.display = 'none';
+                    // Firestoreからデータ再読み込み
+                    await appModule.loadData();
+                    appModule.updateHomePage();
+                } else {
+                    alert('移行に失敗しました: ' + (result.error || result.reason));
+                    btn.disabled = false;
+                    btn.textContent = '移行する';
+                }
+            } catch (e) {
+                alert('移行エラー: ' + e.message);
+                btn.disabled = false;
+                btn.textContent = '移行する';
+            }
+        };
+
+        window.dismissMigration = function() {
+            document.getElementById('migration-banner').style.display = 'none';
+        };
+
+        // チーム切替: login.htmlのチーム選択画面に遷移
+        window.switchTeam = function() {
+            localStorage.removeItem('selectedTeamId');
+            window.location.href = '/login.html';
+        };
+
+        // 認証状態チェック → 未ログインならlogin.htmlへリダイレクト
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // 選択中のチームIDを取得
+            const teamId = localStorage.getItem('selectedTeamId');
+            if (!teamId) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // ユーザーのチーム内ロールを確認
+            const role = await authModule.getUserRole(teamId, user.uid);
+            if (!role) {
+                localStorage.removeItem('selectedTeamId');
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // チーム・ロール設定 & UI制御
+            authModule.setCurrentTeam(teamId, role);
+            authModule.updateUIForRole(role);
+            document.getElementById('header-user-name').textContent = user.displayName || '';
+
+            // チーム名をヘッダーに表示
+            const teams = await authModule.getUserTeams(user.uid);
+            const currentTeam = teams.find(t => t.teamId === teamId);
+            if (currentTeam) {
+                document.getElementById('header-team-switch').textContent = currentTeam.teamName;
+            }
+
+            // アプリ初期化（Firestoreからデータ読み込み）
+            _currentTeamId = teamId;
+            await appModule.init(teamId);
+
+            // LocalStorage移行バナー表示チェック
+            if (hasLocalStorageData() && !isMigrated()) {
+                const summary = getLocalStorageSummary();
+                if (summary) {
+                    const parts = [];
+                    if (summary.players > 0) parts.push(`選手 ${summary.players}件`);
+                    if (summary.lineups > 0) parts.push(`メンバー表 ${summary.lineups}件`);
+                    if (summary.templates > 0) parts.push(`テンプレート ${summary.templates}件`);
+                    if (summary.gameStats > 0) parts.push(`試合成績 ${summary.gameStats}件`);
+                    document.getElementById('migration-summary').textContent =
+                        `旧アプリのデータが見つかりました（${parts.join('、')}）。Firestoreに移行しますか？`;
+                    document.getElementById('migration-banner').style.display = 'block';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ログイン - ソフトボール メンバー表管理</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* ログインページ固有スタイル */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: var(--gray-light, #f5f5f5);
+        }
+
+        .login-step { display: none; width: 100%; max-width: 400px; }
+        .login-step.active { display: block; }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-logo svg {
+            width: 64px;
+            height: 64px;
+            color: var(--primary, #1a73e8);
+        }
+        .login-logo h1 {
+            font-size: 20px;
+            margin-top: 12px;
+            color: var(--text, #333);
+        }
+        .login-logo p {
+            font-size: 14px;
+            color: var(--gray, #888);
+            margin-top: 4px;
+        }
+
+        .google-login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            padding: 14px 24px;
+            background: white;
+            border: 1px solid var(--border, #e0e0e0);
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+        .google-login-btn:hover {
+            background: #f8f9fa;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }
+        .google-login-btn img {
+            width: 20px;
+            height: 20px;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .loading-spinner .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border, #e0e0e0);
+            border-top-color: var(--primary, #1a73e8);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .user-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 12px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+        .user-info {
+            flex: 1;
+        }
+        .user-info .name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .user-info .email {
+            font-size: 12px;
+            color: var(--gray, #888);
+        }
+        .user-header .logout-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            background: none;
+            border: 1px solid var(--border, #e0e0e0);
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--gray, #888);
+        }
+        .user-header .logout-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .team-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: transform 0.15s, box-shadow 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .team-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        .team-card .team-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary, #1a73e8);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .team-card .team-info {
+            flex: 1;
+        }
+        .team-card .team-name {
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .team-card .team-role {
+            font-size: 12px;
+            color: var(--gray, #888);
+            margin-top: 2px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text, #333);
+        }
+
+        .choice-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .choice-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .choice-card h3 {
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border, #e0e0e0);
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary, #1a73e8);
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: opacity 0.15s;
+        }
+        .action-btn:hover { opacity: 0.85; }
+        .action-btn.primary {
+            background: var(--primary, #1a73e8);
+            color: white;
+        }
+        .action-btn.secondary {
+            background: var(--gray-light, #f5f5f5);
+            color: var(--text, #333);
+            border: 1px solid var(--border, #e0e0e0);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+            color: var(--gray, #888);
+            font-size: 13px;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-top: 1px solid var(--border, #e0e0e0);
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+        }
+        .error-message.show { display: block; }
+
+        .welcome-text {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .welcome-text h2 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        .welcome-text p {
+            font-size: 14px;
+            color: var(--gray, #888);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+
+        <!-- ステップ1: ログイン画面（未ログイン） -->
+        <div id="step-login" class="login-step active">
+            <div class="login-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                </svg>
+                <h1>ソフトボール メンバー表管理</h1>
+                <p>チームのメンバー表・成績を管理</p>
+            </div>
+            <button class="google-login-btn" onclick="handleGoogleLogin()">
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Googleでログイン
+            </button>
+        </div>
+
+        <!-- ステップ2: ローディング -->
+        <div id="step-loading" class="login-step">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>読み込み中...</p>
+            </div>
+        </div>
+
+        <!-- ステップ3: 初回ログイン（所属チームなし） -->
+        <div id="step-first-login" class="login-step">
+            <div class="welcome-text">
+                <h2>ようこそ！</h2>
+                <p>チームを作成するか、招待コードで参加してください</p>
+            </div>
+            <div class="choice-cards">
+                <div class="choice-card">
+                    <h3>チームを作成する</h3>
+                    <input type="text" id="new-team-name" class="form-input" placeholder="チーム名を入力">
+                    <div id="create-team-error" class="error-message"></div>
+                    <button class="action-btn primary" onclick="handleCreateTeam()">作成する</button>
+                </div>
+                <div class="divider">または</div>
+                <div class="choice-card">
+                    <h3>招待コードで参加する</h3>
+                    <input type="text" id="invite-code-first" class="form-input" placeholder="6桁の招待コード" maxlength="6">
+                    <div id="join-team-error-first" class="error-message"></div>
+                    <button class="action-btn primary" onclick="handleJoinTeam('first')">参加する</button>
+                </div>
+            </div>
+            <button class="action-btn secondary" style="margin-top: 20px;" onclick="handleLogout()">別のアカウントでログイン</button>
+        </div>
+
+        <!-- ステップ4: チーム選択（所属チーム1つ以上） -->
+        <div id="step-team-select" class="login-step">
+            <div id="user-header" class="user-header">
+                <img id="user-avatar" class="user-avatar" src="" alt="">
+                <div class="user-info">
+                    <div id="user-name" class="name"></div>
+                    <div id="user-email" class="email"></div>
+                </div>
+                <button class="logout-btn" onclick="handleLogout()">ログアウト</button>
+            </div>
+
+            <p class="section-title">チームを選択</p>
+            <div id="team-list">
+                <!-- チームカードが動的に生成される -->
+            </div>
+
+            <div class="divider">その他の操作</div>
+
+            <div class="choice-card">
+                <h3>新しいチームを作成</h3>
+                <input type="text" id="new-team-name-select" class="form-input" placeholder="チーム名を入力">
+                <div id="create-team-error-select" class="error-message"></div>
+                <button class="action-btn primary" onclick="handleCreateTeamFromSelect()">作成する</button>
+            </div>
+
+            <div class="choice-card" style="margin-top: 12px;">
+                <h3>招待コードで参加</h3>
+                <input type="text" id="invite-code-select" class="form-input" placeholder="6桁の招待コード" maxlength="6">
+                <div id="join-team-error-select" class="error-message"></div>
+                <button class="action-btn primary" onclick="handleJoinTeam('select')">参加する</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import './js/firebase-init.js';
+        import { auth } from './js/firebase-init.js';
+        import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
+        import {
+            signInWithGoogle, checkRedirectResult, logout,
+            getUserTeams, createTeam, joinTeamByInviteCode,
+            getCurrentUser
+        } from './js/auth.js';
+
+        // =====================
+        // 画面状態管理
+        // =====================
+        function showStep(stepId) {
+            document.querySelectorAll('.login-step').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(stepId);
+            if (target) target.classList.add('active');
+        }
+
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            if (el) {
+                el.textContent = message;
+                el.classList.add('show');
+            }
+        }
+
+        function clearError(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) el.classList.remove('show');
+        }
+
+        // =====================
+        // チーム一覧を描画
+        // =====================
+        function renderTeamList(teams) {
+            const container = document.getElementById('team-list');
+            container.innerHTML = teams.map(team => {
+                const initial = team.teamName.charAt(0);
+                const roleLabel = team.role === 'admin' ? '管理者' : 'メンバー';
+                return `
+                    <div class="team-card" onclick="selectTeam('${team.teamId}')">
+                        <div class="team-icon">${initial}</div>
+                        <div class="team-info">
+                            <div class="team-name">${team.teamName}</div>
+                            <div class="team-role">${roleLabel}</div>
+                        </div>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // =====================
+        // ユーザー情報を表示
+        // =====================
+        function renderUserHeader(user) {
+            document.getElementById('user-avatar').src = user.photoURL || '';
+            document.getElementById('user-name').textContent = user.displayName || '';
+            document.getElementById('user-email').textContent = user.email || '';
+        }
+
+        // =====================
+        // イベントハンドラ
+        // =====================
+
+        // Googleログイン
+        async function handleGoogleLogin() {
+            showStep('step-loading');
+            try {
+                await signInWithGoogle();
+                // onAuthStateChanged が自動的に呼ばれて画面遷移する
+            } catch (e) {
+                showStep('step-login');
+            }
+        }
+
+        // チーム選択 → index.htmlへ遷移
+        function selectTeam(teamId) {
+            localStorage.setItem('selectedTeamId', teamId);
+            window.location.href = '/index.html';
+        }
+
+        // チーム作成（初回ログイン画面から）
+        async function handleCreateTeam() {
+            clearError('create-team-error');
+            const teamName = document.getElementById('new-team-name').value.trim();
+            if (!teamName) {
+                showError('create-team-error', 'チーム名を入力してください');
+                return;
+            }
+            const user = getCurrentUser();
+            try {
+                const teamId = await createTeam(teamName, user);
+                selectTeam(teamId);
+            } catch (e) {
+                showError('create-team-error', 'チーム作成に失敗しました');
+            }
+        }
+
+        // チーム作成（チーム選択画面から）
+        async function handleCreateTeamFromSelect() {
+            clearError('create-team-error-select');
+            const teamName = document.getElementById('new-team-name-select').value.trim();
+            if (!teamName) {
+                showError('create-team-error-select', 'チーム名を入力してください');
+                return;
+            }
+            const user = getCurrentUser();
+            try {
+                const teamId = await createTeam(teamName, user);
+                selectTeam(teamId);
+            } catch (e) {
+                showError('create-team-error-select', 'チーム作成に失敗しました');
+            }
+        }
+
+        // 招待コードで参加
+        async function handleJoinTeam(source) {
+            const inputId = source === 'first' ? 'invite-code-first' : 'invite-code-select';
+            const errorId = source === 'first' ? 'join-team-error-first' : 'join-team-error-select';
+            clearError(errorId);
+
+            const code = document.getElementById(inputId).value.trim();
+            if (!code) {
+                showError(errorId, '招待コードを入力してください');
+                return;
+            }
+            const user = getCurrentUser();
+            const result = await joinTeamByInviteCode(code, user);
+            if (result.success) {
+                selectTeam(result.teamId);
+            } else {
+                showError(errorId, result.message);
+            }
+        }
+
+        // ログアウト
+        async function handleLogout() {
+            await logout();
+        }
+
+        // =====================
+        // 認証状態リスナー
+        // =====================
+        // リダイレクトログインの結果を確認
+        await checkRedirectResult();
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                showStep('step-login');
+                return;
+            }
+
+            showStep('step-loading');
+
+            // 所属チーム一覧を取得
+            const teams = await getUserTeams(user.uid);
+
+            if (teams.length === 0) {
+                showStep('step-first-login');
+            } else if (teams.length === 1) {
+                // チームが1つだけの場合は自動選択
+                selectTeam(teams[0].teamId);
+            } else {
+                renderUserHeader(user);
+                renderTeamList(teams);
+                showStep('step-team-select');
+            }
+        });
+
+        // inline onclick用にグローバル公開
+        Object.assign(window, {
+            handleGoogleLogin,
+            selectTeam,
+            handleCreateTeam,
+            handleCreateTeamFromSelect,
+            handleJoinTeam,
+            handleLogout
+        });
+    </script>
+</body>
+</html>

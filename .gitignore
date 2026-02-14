@@ -1,0 +1,29 @@
+# Firebase CLI キャッシュ
+.firebase/
+
+# Claude IDE ローカル設定
+.claude/
+
+# MCP サーバー設定（ローカル環境固有）
+.mcp.json
+
+# ゴミファイル
+nul
+
+# OS 生成ファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# エディタ設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+node_modules/
+npm-debug.log
+
+# Firebase デバッグログ
+firebase-debug.log

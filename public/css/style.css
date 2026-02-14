@@ -459,6 +459,13 @@ select.form-control {
     font-weight: 600;
 }
 
+/* wOBAカラム強調 */
+.stats-table .woba-col {
+    background: #e3f2fd;
+    font-weight: 600;
+    color: #1a73e8;
+}
+
 /* Game Stat Item */
 .game-stat-item {
     display: flex;

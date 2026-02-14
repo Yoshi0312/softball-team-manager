@@ -359,7 +359,14 @@
         <!-- Player Stats -->
         <div id="stats-players" style="display: none;">
             <div class="card">
-                <h2 class="card-title">打撃成績一覧</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h2 class="card-title" style="margin: 0;">打撃成績一覧</h2>
+                    <select class="form-control" style="width: auto; padding: 4px 24px 4px 8px; font-size: 11px;" onchange="changeStatsSortBy(this.value)">
+                        <option value="woba">wOBA順</option>
+                        <option value="avg">打率順</option>
+                        <option value="ops">OPS順</option>
+                    </select>
+                </div>
                 <div style="overflow-x: auto;">
                     <table class="stats-table" id="player-stats-table">
                         <thead>
@@ -372,6 +379,7 @@
                                 <th>出塁</th>
                                 <th>長打</th>
                                 <th>OPS</th>
+                                <th>wOBA</th>
                             </tr>
                         </thead>
                         <tbody id="player-stats-body">
@@ -379,7 +387,7 @@
                     </table>
                 </div>
                 <p class="text-muted mt-2" style="font-size: 11px;">
-                    試=試合数 / 出塁=出塁率 / 長打=長打率
+                    試=試合数 / 出塁=出塁率 / 長打=長打率 / wOBA=重み付け出塁率
                 </p>
             </div>
 
@@ -397,6 +405,10 @@
                                 <th>四球</th>
                                 <th>三振</th>
                                 <th>犠打</th>
+                                <th>ISO</th>
+                                <th>BABIP</th>
+                                <th>K%</th>
+                                <th>BB%</th>
                             </tr>
                         </thead>
                         <tbody id="player-detail-body">

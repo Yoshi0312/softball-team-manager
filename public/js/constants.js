@@ -80,3 +80,13 @@ export const DEFAULT_DATA = {
         { id: 'p016', name: '林 昭宏', number: 7, batting: 'right', throwing: 'right', mainPosition: 4, subPositions: [6, 5], grade: '', note: '連絡責任者', status: 'active' }
     ]
 };
+
+// wOBA（重み付け出塁率）のウェイト定数（MLB 2023年基準）
+export const WOBA_WEIGHTS = {
+    bb: 0.694,       // 四球
+    hbp: 0.721,      // 死球
+    single: 0.885,   // 単打
+    double: 1.262,   // 二塁打
+    triple: 1.593,   // 三塁打
+    homerun: 2.058   // 本塁打
+};

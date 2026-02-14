@@ -3,7 +3,7 @@
 // constants.js から定数をimport
 // db.js からFirestoreアクセス関数をimport
 // =====================
-import { POSITIONS, FIELD_POSITIONS, BATTING_RESULTS, GAME_TYPES, DEFAULT_DATA } from './constants.js';
+import { POSITIONS, FIELD_POSITIONS, BATTING_RESULTS, GAME_TYPES, DEFAULT_DATA, WOBA_WEIGHTS } from './constants.js';
 import * as DB from './db.js';
 
 // =====================
@@ -24,7 +24,8 @@ export let state = {
     editingLineupId: null,
     currentGameStat: null,
     selectedYear: new Date().getFullYear(),
-    selectedGameType: 'all'
+    selectedGameType: 'all',
+    statsSortBy: 'woba'
 };
 
 let reserveCount = 3;
@@ -1635,7 +1636,7 @@ export function calculatePlayerStats(playerId, year, gameType) {
         });
     });
 
-    // 計算
+    // 基本指標の計算
     stats.avg = stats.atBats > 0 ? stats.hits / stats.atBats : 0;
     stats.slg = stats.atBats > 0 ? stats.totalBases / stats.atBats : 0;
 
@@ -1644,7 +1645,44 @@ export function calculatePlayerStats(playerId, year, gameType) {
 
     stats.ops = stats.obp + stats.slg;
 
+    // 打席数（PA = 打数 + 四球 + 死球 + 犠飛 + 犠打）
+    stats.pa = stats.atBats + stats.walks + stats.hitByPitch + stats.sacrificeFlies + stats.sacrifices;
+
+    // wOBA（重み付け出塁率）
+    const wobaDenom = stats.atBats + stats.walks + stats.hitByPitch + stats.sacrificeFlies;
+    if (wobaDenom > 0) {
+        stats.woba = (
+            WOBA_WEIGHTS.bb * stats.walks +
+            WOBA_WEIGHTS.hbp * stats.hitByPitch +
+            WOBA_WEIGHTS.single * stats.singles +
+            WOBA_WEIGHTS.double * stats.doubles +
+            WOBA_WEIGHTS.triple * stats.triples +
+            WOBA_WEIGHTS.homerun * stats.homeRuns
+        ) / wobaDenom;
+    } else {
+        stats.woba = 0;
+    }
+
+    // ISO（純粋長打力 = 長打率 - 打率）
+    stats.iso = stats.slg - stats.avg;
+
+    // BABIP（インプレー打率）= (安打 - 本塁打) / (打数 - 三振 - 本塁打 + 犠飛)
+    const babipDenom = stats.atBats - stats.strikeouts - stats.homeRuns + stats.sacrificeFlies;
+    stats.babip = babipDenom > 0 ? (stats.hits - stats.homeRuns) / babipDenom : 0;
+
+    // K%（三振率）= 三振 / 打席数
+    stats.kRate = stats.pa > 0 ? stats.strikeouts / stats.pa : 0;
+
+    // BB%（四球率）= 四球 / 打席数
+    stats.bbRate = stats.pa > 0 ? stats.walks / stats.pa : 0;
+
     return stats;
+}
+
+// 選手成績のソート基準を変更
+export function changeStatsSortBy(sortBy) {
+    state.statsSortBy = sortBy;
+    renderPlayerStats();
 }
 
 export function renderPlayerStats() {
@@ -1652,15 +1690,16 @@ export function renderPlayerStats() {
     const detailBody = document.getElementById('player-detail-body');
     const activePlayers = state.players.filter(p => p.status === 'active');
 
+    const sortKey = state.statsSortBy || 'woba';
     const playerStats = activePlayers.map(player => ({
         player,
         stats: calculatePlayerStats(player.id, state.selectedYear, state.selectedGameType)
     })).filter(ps => ps.stats.games > 0)
-      .sort((a, b) => b.stats.avg - a.stats.avg);
+      .sort((a, b) => b.stats[sortKey] - a.stats[sortKey]);
 
     if (playerStats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
-        detailBody.innerHTML = '<tr><td colspan="8" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
+        detailBody.innerHTML = '<tr><td colspan="12" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
         return;
     }
 
@@ -1676,7 +1715,8 @@ export function renderPlayerStats() {
                 <td class="highlight">${formatAvg(s.avg)}</td>
                 <td>${formatAvg(s.obp)}</td>
                 <td>${formatAvg(s.slg)}</td>
-                <td class="highlight">${formatAvg(s.ops)}</td>
+                <td>${formatAvg(s.ops)}</td>
+                <td class="highlight woba-col">${formatAvg(s.woba)}</td>
             </tr>
         `;
     }).join('');
@@ -1694,6 +1734,10 @@ export function renderPlayerStats() {
                 <td>${s.walks}</td>
                 <td>${s.strikeouts}</td>
                 <td>${s.sacrifices}</td>
+                <td class="highlight">${formatAvg(s.iso)}</td>
+                <td>${formatAvg(s.babip)}</td>
+                <td>${formatPercent(s.kRate)}</td>
+                <td>${formatPercent(s.bbRate)}</td>
             </tr>
         `;
     }).join('');
@@ -1703,6 +1747,11 @@ export function formatAvg(value) {
     if (value === 0) return '.000';
     if (value >= 1) return value.toFixed(3);
     return value.toFixed(3).substring(1);
+}
+
+// パーセント表示フォーマッタ（K%, BB%用）
+export function formatPercent(value) {
+    return (value * 100).toFixed(1) + '%';
 }
 
 export function showPlayerStatDetail(playerId) {
@@ -1718,7 +1767,7 @@ export function showPlayerStatDetail(playerId) {
     title.textContent = `${player.name} - ${state.selectedYear}年成績${typeLabel}`;
 
     body.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
             <div class="card" style="margin: 0;">
                 <div style="font-size: 12px; color: var(--gray);">打率</div>
                 <div style="font-size: 24px; font-weight: 600;">${formatAvg(stats.avg)}</div>
@@ -1727,11 +1776,16 @@ export function showPlayerStatDetail(playerId) {
                 <div style="font-size: 12px; color: var(--gray);">OPS</div>
                 <div style="font-size: 24px; font-weight: 600;">${formatAvg(stats.ops)}</div>
             </div>
+            <div class="card" style="margin: 0; background: #e3f2fd;">
+                <div style="font-size: 12px; color: var(--gray);">wOBA</div>
+                <div style="font-size: 24px; font-weight: 600; color: #1a73e8;">${formatAvg(stats.woba)}</div>
+            </div>
         </div>
 
         <table class="stats-table mt-4">
             <tr><th>項目</th><th>数値</th></tr>
             <tr><td>試合数</td><td>${stats.games}</td></tr>
+            <tr><td>打席数</td><td>${stats.pa}</td></tr>
             <tr><td>打数</td><td>${stats.atBats}</td></tr>
             <tr><td>安打</td><td>${stats.hits}</td></tr>
             <tr><td>二塁打</td><td>${stats.doubles}</td></tr>
@@ -1744,8 +1798,15 @@ export function showPlayerStatDetail(playerId) {
             <tr><td>犠打</td><td>${stats.sacrifices}</td></tr>
             <tr><td>犠飛</td><td>${stats.sacrificeFlies}</td></tr>
             <tr><td>塁打</td><td>${stats.totalBases}</td></tr>
+            <tr><td>打率</td><td>${formatAvg(stats.avg)}</td></tr>
             <tr><td>出塁率</td><td>${formatAvg(stats.obp)}</td></tr>
             <tr><td>長打率</td><td>${formatAvg(stats.slg)}</td></tr>
+            <tr><td>OPS</td><td>${formatAvg(stats.ops)}</td></tr>
+            <tr style="background: #e3f2fd; font-weight: 600;"><td>wOBA</td><td>${formatAvg(stats.woba)}</td></tr>
+            <tr><td>ISO</td><td>${formatAvg(stats.iso)}</td></tr>
+            <tr><td>BABIP</td><td>${formatAvg(stats.babip)}</td></tr>
+            <tr><td>K%</td><td>${formatPercent(stats.kRate)}</td></tr>
+            <tr><td>BB%</td><td>${formatPercent(stats.bbRate)}</td></tr>
         </table>
     `;
 

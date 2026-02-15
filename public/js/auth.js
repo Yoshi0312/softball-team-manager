@@ -27,6 +27,34 @@ export let currentUserRole = null;
 // 認証関数
 // =====================
 
+
+// Firebase Authエラーをユーザー向けメッセージに変換
+function getAuthErrorMessage(error) {
+  const rawMessage = error?.message || '不明なエラー';
+  const code = error?.code || '';
+
+  // APIキーのHTTPリファラー制限でブロックされたケース
+  if (
+    code === 'auth/requests-from-referer-are-blocked' ||
+    rawMessage.includes('requests-from-referer')
+  ) {
+    return [
+      'ログインに失敗しました: APIキーのリファラー制限によりブロックされています。',
+      'Firebase Console / Google Cloud Console で、現在のアクセス元ドメイン（例: membermanage-softball.firebaseapp.com, membermanage-softball.web.app, localhost）を許可してください。'
+    ].join('\n');
+  }
+
+  if (code === 'auth/invalid-api-key') {
+    return 'ログインに失敗しました: Firebase APIキーが無効です。firebase-init.js の設定値を確認してください。';
+  }
+
+  if (code === 'auth/unauthorized-domain') {
+    return 'ログインに失敗しました: このドメインは認証許可ドメインに登録されていません。Firebase Authentication の設定を確認してください。';
+  }
+
+  return 'ログインに失敗しました: ' + rawMessage;
+}
+
 // Googleログイン（ポップアップ優先、ブロック時はリダイレクトにフォールバック）
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
@@ -37,7 +65,7 @@ export async function signInWithGoogle() {
       return signInWithRedirect(auth, provider);
     }
     console.error('ログインエラー:', e);
-    alert('ログインに失敗しました: ' + e.message);
+    alert(getAuthErrorMessage(e));
     throw e;
   }
 }
@@ -48,6 +76,7 @@ export async function checkRedirectResult() {
     return await getRedirectResult(auth);
   } catch (e) {
     console.error('リダイレクト結果の取得エラー:', e);
+    alert(getAuthErrorMessage(e));
     return null;
   }
 }

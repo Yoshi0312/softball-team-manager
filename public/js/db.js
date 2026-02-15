@@ -187,16 +187,23 @@ export async function updateGameStatWithMeta(teamId, statId, statData, currentVe
 }
 
 /**
- * 楽観的ロック: 競合を検出
- * サーバーのmeta.updatedAtがクライアントより新しい場合はconflict
+ * 楽観的ロック: 競合を検出（version主体 + updatedAt補助）
+ *
+ * 判定順序:
+ *   1. ドキュメント不存在 → conflict=false
+ *   2. サーバーにmetaなし（旧データ）→ conflict=false
+ *   3. クライアントにversion/updatedAtなし（旧データ初回更新）→ conflict=false
+ *   4. version比較（主）: server > client → conflict=true
+ *   5. versionが一致 → conflict=false
+ *   6. versionがない場合のみ updatedAt比較（補助フォールバック）
  *
  * @param {string} teamId
  * @param {string} collectionName - 'gameStats' | 'lineups' 等
  * @param {string} docId - ドキュメントID
- * @param {string} clientUpdatedAt - クライアント側の最終更新日時（ISO文字列）
+ * @param {Object} [clientMeta={}] - { version?: number, updatedAt?: string }
  * @returns {Object} { conflict: boolean, serverData?: Object }
  */
-export async function checkConflict(teamId, collectionName, docId, clientUpdatedAt) {
+export async function checkConflict(teamId, collectionName, docId, clientMeta = {}) {
     const ref = doc(db, 'teams', teamId, collectionName, docId);
     const snapshot = await getDoc(ref);
 
@@ -205,16 +212,32 @@ export async function checkConflict(teamId, collectionName, docId, clientUpdated
     }
 
     const serverData = { id: snapshot.id, ...snapshot.data() };
-    const serverUpdatedAt = serverData.meta?.updatedAt;
+    const serverMeta = serverData.meta;
 
-    // サーバーにmeta情報がない場合（旧データ）は競合なし
-    if (!serverUpdatedAt || !clientUpdatedAt) {
+    // サーバーにmeta情報がない場合（旧データ）→ 競合なし
+    if (!serverMeta) {
         return { conflict: false };
     }
 
-    // サーバーの更新日時がクライアントより新しい場合は競合
-    if (serverUpdatedAt > clientUpdatedAt) {
-        return { conflict: true, serverData };
+    // クライアントにmeta情報がない場合（旧データからの初回更新）→ 競合なし
+    if (!clientMeta.version && !clientMeta.updatedAt) {
+        return { conflict: false };
+    }
+
+    // version比較（主）: 両方にversionがあればversionで判定
+    if (clientMeta.version !== undefined && serverMeta.version !== undefined) {
+        if (serverMeta.version > clientMeta.version) {
+            return { conflict: true, serverData };
+        }
+        // versionが一致 → 競合なし
+        return { conflict: false };
+    }
+
+    // updatedAt比較（補助/フォールバック）: versionがない場合のみ
+    if (clientMeta.updatedAt && serverMeta.updatedAt) {
+        if (serverMeta.updatedAt > clientMeta.updatedAt) {
+            return { conflict: true, serverData };
+        }
     }
 
     return { conflict: false };

@@ -4,7 +4,7 @@
 // 試合・選手・チームの集計ロジックを一箇所に集約
 // =====================
 import { BATTING_RESULTS, GAME_TYPES, WOBA_WEIGHTS } from '../constants.js';
-import { getGameType } from './game-utils.js';
+import { getGameType, resolveGameType } from './game-utils.js';
 
 /**
  * 試合配列をフィルタリング
@@ -23,7 +23,7 @@ export function filterGames(games, options = {}) {
             const gameYear = new Date(g.date).getFullYear();
             if (gameYear !== year) return false;
         }
-        if (type !== 'all' && getGameType(g) !== type) return false;
+        if (type !== 'all' && resolveGameType(g) !== type) return false;
         return true;
     });
 }
@@ -147,6 +147,7 @@ export function calculatePlayerStats(games, playerId, options = {}) {
  * @param {Array<Object>} games - 試合データ配列
  * @param {Object} [options]
  * @param {number} [options.year] - 対象年度
+ * @param {string} [options.type='all'] - 試合種別（'all'で全種別、特定値でその種別のみ）
  * @returns {Array<Object>} 種別ごとのサマリ配列
  *   [{ type, label, count, wins, losses, draws, scored, conceded, diff, winRate }]
  */
@@ -155,9 +156,13 @@ export function calculateTeamSummary(games, options = {}) {
         ? filterGames(games, { year: options.year })
         : games;
 
-    const types = Object.keys(GAME_TYPES);
+    // type指定があればその種別のみ、なければ全種別を返す
+    const types = (options.type && options.type !== 'all')
+        ? [options.type]
+        : Object.keys(GAME_TYPES);
+
     return types.map(type => {
-        const typeGames = filtered.filter(g => getGameType(g) === type);
+        const typeGames = filtered.filter(g => resolveGameType(g) === type);
         let wins = 0, losses = 0, draws = 0, scored = 0, conceded = 0;
 
         typeGames.forEach(g => {

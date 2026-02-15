@@ -13,6 +13,16 @@ export function getGameType(game) {
 }
 
 /**
+ * 試合種別を解決（新フィールド type を優先、なければ旧 gameType にフォールバック）
+ * 移行期の互換関数: 将来は g.type が正式フィールドとなる
+ * @param {Object} g - 試合データ
+ * @returns {string} 'official' | 'official_senior' | 'practice' | 'intrasquad'
+ */
+export function resolveGameType(g) {
+    return g.type ?? getGameType(g);
+}
+
+/**
  * 打率/OPS等を .000 形式でフォーマット
  * @param {number} value
  * @returns {string}

@@ -9,7 +9,7 @@ import * as DB from './db.js';
 
 // domain層からimport（純粋関数）
 import {
-    getGameType, formatAvg, formatPercent,
+    getGameType, resolveGameType, formatAvg, formatPercent,
     getBattingClass, getBattingLabel, getPositionFit, generateId
 } from './domain/game-utils.js';
 import {
@@ -27,7 +27,7 @@ import {
 
 // domain/ui関数を再export（index.htmlのObject.assign互換維持）
 export { state };
-export { getGameType, formatAvg, formatPercent, getBattingClass, getBattingLabel, getPositionFit, generateId };
+export { getGameType, resolveGameType, formatAvg, formatPercent, getBattingClass, getBattingLabel, getPositionFit, generateId };
 export { filterGames, getAvailableYears, calculateTeamSummary };
 export { calcStats as calculatePlayerStats };
 
@@ -993,7 +993,7 @@ export function renderGameStatsList() {
                 <div class="game-stat-score ${scoreClass}">${ourScore}-${oppScore}</div>
                 <div class="game-stat-info">
                     <div class="game-stat-title">vs ${g.opponent || '未設定'}</div>
-                    <div class="game-stat-meta">${g.date} ${g.tournament || ''} <span style="background:var(--gray-light);padding:1px 6px;border-radius:4px;font-size:11px;">${(GAME_TYPES[getGameType(g)] || {}).label || '練習試合'}</span></div>
+                    <div class="game-stat-meta">${g.date} ${g.tournament || ''} <span style="background:var(--gray-light);padding:1px 6px;border-radius:4px;font-size:11px;">${(GAME_TYPES[resolveGameType(g)] || {}).label || '練習試合'}</span></div>
                 </div>
                 <button class="icon-btn danger" onclick="event.stopPropagation(); deleteGameStatConfirm('${g.id}')" title="削除">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1133,7 +1133,7 @@ export function openGameStatModal(gameId = null, lineupId = null) {
     // 試合種別を設定
     const gameTypeSelect = document.getElementById('game-stat-game-type');
     if (gameTypeSelect) {
-        gameTypeSelect.value = getGameType(state.currentGameStat);
+        gameTypeSelect.value = resolveGameType(state.currentGameStat);
     }
 
     // 先攻後攻を設定
@@ -1476,11 +1476,14 @@ export async function saveGameStat() {
 
     try {
         if (editId) {
-            // 競合チェック（楽観的ロック）
-            const clientUpdatedAt = state.currentGameStat.meta?.updatedAt;
-            if (clientUpdatedAt) {
+            // 競合チェック（楽観的ロック: version主体）
+            const clientMeta = state.currentGameStat.meta;
+            if (clientMeta?.version || clientMeta?.updatedAt) {
                 const { conflict, serverData } = await DB.checkConflict(
-                    state.teamId, 'gameStats', editId, clientUpdatedAt
+                    state.teamId, 'gameStats', editId, {
+                        version: clientMeta.version,
+                        updatedAt: clientMeta.updatedAt
+                    }
                 );
                 if (conflict) {
                     const overwrite = confirm(
@@ -1503,6 +1506,7 @@ export async function saveGameStat() {
 
             // Firestore更新（meta付き）
             const { id, createdAt, meta, ...statData } = state.currentGameStat;
+            statData.type = state.currentGameStat.gameType;  // 正式フィールドとして付与
             const currentVersion = meta?.version || 0;
             const result = await DB.updateGameStatWithMeta(state.teamId, editId, statData, currentVersion);
             const idx = state.gameStats.findIndex(g => g.id === editId);
@@ -1516,6 +1520,7 @@ export async function saveGameStat() {
         } else {
             // Firestore新規作成（meta付き）
             const { id, createdAt, meta, ...statData } = state.currentGameStat;
+            statData.type = state.currentGameStat.gameType;  // 正式フィールドとして付与
             const result = await DB.addGameStatWithMeta(state.teamId, statData);
             state.currentGameStat.id = result.id;
             state.currentGameStat.meta = { version: result.version, updatedAt: result.updatedAt };

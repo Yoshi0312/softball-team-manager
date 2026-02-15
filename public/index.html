@@ -773,29 +773,6 @@
         // ES Modules の関数を window に公開（inline onclick から呼べるようにする）
         Object.assign(window, appModule, authModule);
 
-        // デバッグ: window公開関数の存在チェック
-        const _required = [
-            'showPage','openSettings','renderPlayerList','openPlayerModal',
-            'closePlayerModal','savePlayer','deletePlayer','startNewLineup',
-            'toggleDPRows','updateStarterPosition','updateStarterPlayer',
-            'updateReserve','addReserveSlot','saveLineup','saveAsTemplate',
-            'loadLineup','deleteLineup','previewLineup','switchPreviewTab',
-            'downloadAsImage','switchSavedTab','switchStatsTab',
-            'changeStatsYear','changeStatsGameType','changeStatsSortBy',
-            'openLineupSelectModal','closeLineupSelectModal',
-            'openGameStatFromLineup','openGameStatModal',
-            'updateBattingOrder','renderInningScoreTable',
-            'updateAtBat','updatePlayerStat','calcTotalScore',
-            'updatePitcherStat','addPitcherEntry','removePitcherEntry',
-            'closeGameStatModal','saveGameStat','deleteGameStatConfirm',
-            'deleteGameStat','showPlayerStatDetail','closePlayerStatModal',
-            'closeConfirmModal','confirmAction',
-            'saveSettings','exportData','importData','confirmClearData','logout'
-        ];
-        const _miss = _required.filter(fn => typeof window[fn] !== 'function');
-        if (_miss.length) console.error('未登録関数:', _miss);
-        else console.log('✓ 全onclick関数がwindowに登録済み (' + _required.length + '個)');
-
         // 移行バナーの操作をwindowに公開
         let _currentTeamId = null;
 
@@ -832,6 +809,30 @@
             localStorage.removeItem('selectedTeamId');
             window.location.href = '/login.html';
         };
+
+        // デバッグ: index.html の inline onclick で使う関数が window で解決できるか確認
+        const _required = [
+            'showPage', 'openSettings', 'switchTeam', 'logout',
+            'startMigration', 'dismissMigration',
+            'renderPlayerList', 'openPlayerModal', 'closePlayerModal', 'savePlayer', 'deletePlayer',
+            'startNewLineup', 'toggleDPRows', 'updateStarterPosition', 'updateStarterPlayer',
+            'updateReserve', 'addReserveSlot', 'saveLineup', 'saveAsTemplate',
+            'loadLineup', 'deleteLineup', 'previewLineup', 'switchPreviewTab',
+            'downloadAsImage', 'switchSavedTab', 'switchStatsTab',
+            'changeStatsYear', 'changeStatsGameType', 'changeStatsSortBy',
+            'openLineupSelectModal', 'closeLineupSelectModal',
+            'openGameStatFromLineup', 'openGameStatModal',
+            'updateBattingOrder', 'renderInningScoreTable',
+            'updateAtBat', 'updatePlayerStat', 'calcTotalScore',
+            'updatePitcherStat', 'addPitcherEntry', 'removePitcherEntry',
+            'closeGameStatModal', 'saveGameStat', 'deleteGameStatConfirm', 'deleteGameStat',
+            'showPlayerStatDetail', 'closePlayerStatModal',
+            'closeConfirmModal', 'confirmAction',
+            'saveSettings', 'exportData', 'importData', 'confirmClearData'
+        ];
+        const _miss = _required.filter(fn => typeof window[fn] !== 'function');
+        if (_miss.length) console.error('未登録関数:', _miss);
+        else console.log('✓ 全onclick関数がwindowに登録済み (' + _required.length + '個)');
 
         // 認証状態チェック → 未ログインならlogin.htmlへリダイレクト
         onAuthStateChanged(auth, async (user) => {

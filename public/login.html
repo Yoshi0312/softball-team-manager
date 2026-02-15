@@ -432,6 +432,8 @@
         // チーム選択 → index.htmlへ遷移
         function selectTeam(teamId) {
             localStorage.setItem('selectedTeamId', teamId);
+            // 明示的なチーム選択要求フラグをクリア
+            localStorage.removeItem('forceTeamSelect');
             window.location.href = '/index.html';
         }
 
@@ -497,6 +499,10 @@
         // =====================
         // 認証状態リスナー
         // =====================
+        function shouldForceTeamSelect() {
+            return localStorage.getItem('forceTeamSelect') === '1';
+        }
+
         // リダイレクトログインの結果を確認
         await checkRedirectResult();
 
@@ -513,14 +519,20 @@
 
             if (teams.length === 0) {
                 showStep('step-first-login');
-            } else if (teams.length === 1) {
-                // チームが1つだけの場合は自動選択
-                selectTeam(teams[0].teamId);
-            } else {
-                renderUserHeader(user);
-                renderTeamList(teams);
-                showStep('step-team-select');
+                return;
             }
+
+            const forceTeamSelect = shouldForceTeamSelect();
+            if (teams.length === 1 && !forceTeamSelect) {
+                // チームが1つだけで、明示的な選択要求がない場合のみ自動選択
+                selectTeam(teams[0].teamId);
+                return;
+            }
+
+            // 2チーム以上、または明示的にチーム選択画面を開く場合
+            renderUserHeader(user);
+            renderTeamList(teams);
+            showStep('step-team-select');
         });
 
         // inline onclick用にグローバル公開

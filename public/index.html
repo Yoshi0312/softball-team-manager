@@ -807,6 +807,8 @@
         // チーム切替: login.htmlのチーム選択画面に遷移
         window.switchTeam = function() {
             localStorage.removeItem('selectedTeamId');
+            // チームが1つでも自動再選択されないように、明示的に選択画面を要求
+            localStorage.setItem('forceTeamSelect', '1');
             window.location.href = '/login.html';
         };
 

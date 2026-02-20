@@ -102,6 +102,61 @@ export async function getGameStats(teamId) {
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+// =====================
+// 出欠イベント (events)
+// =====================
+
+// イベント一覧を取得
+export async function getEvents(teamId) {
+    const ref = collection(db, 'teams', teamId, 'events');
+    const q = query(ref, orderBy('date', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// イベントを追加
+export async function addEvent(teamId, eventData) {
+    const ref = collection(db, 'teams', teamId, 'events');
+    const docRef = await addDoc(ref, {
+        ...eventData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+    });
+    return docRef.id;
+}
+
+// イベントを更新
+export async function updateEvent(teamId, eventId, eventData) {
+    const ref = doc(db, 'teams', teamId, 'events', eventId);
+    await updateDoc(ref, {
+        ...eventData,
+        updatedAt: serverTimestamp()
+    });
+}
+
+// 出欠回答を保存（event配下attendances/{userId}）
+export async function saveAttendance(teamId, eventId, userId, attendanceData) {
+    const ref = doc(db, 'teams', teamId, 'events', eventId, 'attendances', userId);
+    await setDoc(ref, {
+        ...attendanceData,
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+}
+
+// イベントの出欠回答一覧を取得
+export async function getAttendancesByEvent(teamId, eventId) {
+    const ref = collection(db, 'teams', teamId, 'events', eventId, 'attendances');
+    const snapshot = await getDocs(ref);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// チームメンバー一覧を取得
+export async function getTeamMembers(teamId) {
+    const ref = collection(db, 'teams', teamId, 'members');
+    const snapshot = await getDocs(ref);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
 // 試合成績を追加
 export async function addGameStat(teamId, statData) {
     const ref = collection(db, 'teams', teamId, 'gameStats');
@@ -247,14 +302,16 @@ export async function checkConflict(teamId, collectionName, docId, clientMeta = 
 // 全データ一括読み込み（init用）
 // =====================
 export async function loadAllData(teamId) {
-    const [players, lineups, templates, gameStats, settings] = await Promise.all([
+    const [players, lineups, templates, gameStats, settings, events, teamMembers] = await Promise.all([
         getPlayers(teamId),
         getLineups(teamId),
         getTemplates(teamId),
         getGameStats(teamId),
-        getTeamSettings(teamId)
+        getTeamSettings(teamId),
+        getEvents(teamId),
+        getTeamMembers(teamId)
     ]);
-    return { players, lineups, templates, gameStats, settings };
+    return { players, lineups, templates, gameStats, settings, events, teamMembers };
 }
 
 // =====================
@@ -275,6 +332,20 @@ export async function deleteAllData(teamId) {
         if (snapshot.docs.length > 0) {
             await batch.commit();
         }
+    }
+
+    // events と配下 attendances を削除
+    const eventsRef = collection(db, 'teams', teamId, 'events');
+    const eventSnapshot = await getDocs(eventsRef);
+    for (const eventDoc of eventSnapshot.docs) {
+        const attendanceRef = collection(db, 'teams', teamId, 'events', eventDoc.id, 'attendances');
+        const attendanceSnapshot = await getDocs(attendanceRef);
+        if (attendanceSnapshot.docs.length > 0) {
+            const attendanceBatch = writeBatch(db);
+            attendanceSnapshot.docs.forEach(d => attendanceBatch.delete(d.ref));
+            await attendanceBatch.commit();
+        }
+        await deleteDoc(eventDoc.ref);
     }
 
     // 設定をリセット

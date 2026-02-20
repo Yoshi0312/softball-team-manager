@@ -2,9 +2,10 @@
 // ホームページ
 // =====================
 import { state } from '../state.js';
+import { getLatestAttendanceSummary } from './attendance.js';
 
-/** ホーム画面を更新（選手サマリ + 直近メンバー表） */
-export function updateHomePage() {
+/** ホーム画面を更新（選手サマリ + 直近メンバー表 + 出欠サマリ） */
+export async function updateHomePage() {
     const activePlayers = state.players.filter(p => p.status === 'active');
     const summary = document.getElementById('home-player-summary');
 
@@ -27,7 +28,7 @@ export function updateHomePage() {
             return `
                 <div class="card" style="padding: 12px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;" onclick="loadLineup('${l.id}')" style="cursor: pointer;">
+                        <div style="flex: 1; cursor: pointer;" onclick="loadLineup('${l.id}')">
                             <div style="font-weight: 500; margin-bottom: 4px;">${l.tournament}</div>
                             <div style="font-size: 13px; color: var(--gray);">${l.date} vs ${l.opponent || '未定'}</div>
                             ${scoreText ? `<div class="game-stat-score ${scoreClass}" style="font-size: 16px; margin-top: 4px;">${scoreText}</div>` : ''}
@@ -44,4 +45,19 @@ export function updateHomePage() {
     } else {
         recentContainer.innerHTML = `<p class="text-muted">保存されたメンバー表はありません</p>`;
     }
+
+    const attendanceSummary = document.getElementById('home-attendance-summary');
+    if (!attendanceSummary) return;
+
+    const latest = await getLatestAttendanceSummary();
+    if (!latest.eventTitle) {
+        attendanceSummary.innerHTML = '<p class="text-muted">イベントがまだありません</p>';
+        return;
+    }
+
+    const names = latest.unansweredMembers.map(m => m.displayName || m.email || m.id);
+    attendanceSummary.innerHTML = `
+        <p style="margin-bottom: 4px;"><strong>${latest.eventTitle}</strong> の未回答者: <strong>${latest.unansweredCount}</strong>名</p>
+        ${names.length ? `<p class="text-muted" style="font-size: 12px;">${names.join(' / ')}</p>` : '<p class="text-muted">全員回答済みです</p>'}
+    `;
 }

@@ -9,6 +9,8 @@ export const state = {
     lineups: [],
     templates: [],
     gameStats: [],
+    events: [],
+    teamMembers: [],
     settings: {
         teamName: '',
         defaultManager: '',

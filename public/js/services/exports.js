@@ -4,6 +4,7 @@
 import { state } from '../ui/state.js';
 import * as DB from '../db.js';
 import { showConfirm } from '../ui/modals/confirmModal.js';
+import { alertFirestoreWriteError } from '../ui/alerts.js';
 
 /**
  * loadData は app.js に定義されている。
@@ -35,6 +36,15 @@ export function importData(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    showConfirm(
+        'インポートを実行すると既存データは全て上書きされます。\n実行前に「データをエクスポート」でバックアップ取得を推奨します。\nこのまま続行しますか？',
+        () => runImport(file)
+    );
+
+    event.target.value = '';
+}
+
+async function runImport(file) {
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
@@ -83,17 +93,15 @@ export function importData(event) {
             alert('データをインポートしました');
             window.showPage('home');
         } catch (err) {
-            console.error('インポートエラー:', err);
-            alert('ファイルの読み込みに失敗しました: ' + err.message);
+            alertFirestoreWriteError('データインポートエラー', err);
         }
     };
     reader.readAsText(file);
-    event.target.value = '';
 }
 
 /** 全データ削除 */
 export function confirmClearData() {
-    showConfirm('全てのデータを削除しますか？\nこの操作は取り消せません。', async () => {
+    showConfirm('全てのデータを削除しますか？\nこの操作は取り消せません。\n実行前に「データをエクスポート」でバックアップ取得を推奨します。', async () => {
         try {
             await DB.deleteAllData(state.teamId);
             state.players = [];
@@ -106,8 +114,7 @@ export function confirmClearData() {
             alert('全てのデータを削除しました');
             window.showPage('home');
         } catch (e) {
-            console.error('全データ削除エラー:', e);
-            alert('削除に失敗しました: ' + e.message);
+            alertFirestoreWriteError('全データ削除エラー', e);
         }
     });
 }

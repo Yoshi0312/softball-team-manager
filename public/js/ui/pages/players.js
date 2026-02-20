@@ -6,6 +6,7 @@ import { POSITIONS } from '../../constants.js';
 import * as DB from '../../db.js';
 import { getBattingClass, getBattingLabel } from '../../domain/game-utils.js';
 import { showConfirm } from '../modals/confirmModal.js';
+import { alertFirestoreWriteError } from '../alerts.js';
 
 /** 選手一覧を描画 */
 export function renderPlayerList() {
@@ -144,8 +145,7 @@ export async function savePlayer() {
         closePlayerModal();
         renderPlayerList();
     } catch (e) {
-        console.error('選手保存エラー:', e);
-        alert('保存に失敗しました: ' + e.message);
+        alertFirestoreWriteError('選手保存エラー', e);
     }
 }
 
@@ -161,8 +161,7 @@ export function deletePlayer() {
             closePlayerModal();
             renderPlayerList();
         } catch (e) {
-            console.error('選手削除エラー:', e);
-            alert('削除に失敗しました: ' + e.message);
+            alertFirestoreWriteError('選手削除エラー', e);
         }
     });
 }

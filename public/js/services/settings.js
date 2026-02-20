@@ -11,6 +11,7 @@ import {
     reissueInviteCode,
     buildInviteUrl
 } from '../auth.js';
+import { alertFirestoreWriteError } from '../ui/alerts.js';
 
 /** 設定フォームを読み込み */
 export function loadSettings() {
@@ -93,7 +94,7 @@ export async function createInviteLinkFromAdmin() {
         document.getElementById('invite-latest-url').value = url;
         await loadInviteManagement();
     } catch (e) {
-        alert('招待リンクの生成に失敗しました');
+        alertFirestoreWriteError('招待リンク生成エラー', e);
     }
 }
 
@@ -118,7 +119,7 @@ export async function reissueInviteFromAdmin(inviteCode) {
         document.getElementById('invite-latest-url').value = buildInviteUrl(newCode);
         await loadInviteManagement();
     } catch (e) {
-        alert('招待リンクの再発行に失敗しました');
+        alertFirestoreWriteError('招待リンク再発行エラー', e);
     }
 }
 
@@ -127,7 +128,7 @@ export async function invalidateInviteFromAdmin(inviteCode) {
         await revokeInviteCode(inviteCode);
         await loadInviteManagement();
     } catch (e) {
-        alert('招待リンクの無効化に失敗しました');
+        alertFirestoreWriteError('招待リンク無効化エラー', e);
     }
 }
 
@@ -141,8 +142,7 @@ export async function saveSettings() {
         await DB.updateTeamSettings(state.teamId, state.settings);
         alert('設定を保存しました');
     } catch (e) {
-        console.error('設定保存エラー:', e);
-        alert('設定の保存に失敗しました: ' + e.message);
+        alertFirestoreWriteError('設定保存エラー', e);
     }
 }
 

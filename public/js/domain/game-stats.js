@@ -206,3 +206,103 @@ export function getAvailableYears(games) {
     });
     return Array.from(years).sort((a, b) => b - a);
 }
+
+/**
+ * 年/月/種別で時系列集計を作成
+ *
+ * @param {Array<Object>} games - 試合データ配列
+ * @param {Object} [options]
+ * @param {number} [options.year] - 対象年度（省略時は全年度）
+ * @param {string} [options.type='all'] - 試合種別フィルタ
+ * @param {'year'|'month'} [options.groupBy='month'] - 集約粒度
+ * @returns {Array<Object>} 時系列サマリ
+ */
+export function aggregateGamesByPeriod(games, options = {}) {
+    const { year, type = 'all', groupBy = 'month' } = options;
+    const filtered = filterGames(games, { year, type });
+    const buckets = new Map();
+
+    filtered.forEach(game => {
+        if (!game.date) return;
+
+        const date = new Date(game.date);
+        if (Number.isNaN(date.getTime())) return;
+
+        const y = date.getFullYear();
+        const m = date.getMonth() + 1;
+        const gameType = resolveGameType(game);
+        const key = groupBy === 'year' ? `${y}` : `${y}-${String(m).padStart(2, '0')}`;
+
+        if (!buckets.has(key)) {
+            buckets.set(key, {
+                key,
+                year: y,
+                month: groupBy === 'month' ? m : null,
+                label: groupBy === 'year' ? `${y}` : `${m}月`,
+                type: gameType,
+                count: 0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                scored: 0,
+                conceded: 0,
+                diff: 0,
+                winRate: 0
+            });
+        }
+
+        const bucket = buckets.get(key);
+        const our = game.ourScore || 0;
+        const opp = game.opponentScore || 0;
+
+        bucket.count++;
+        bucket.scored += our;
+        bucket.conceded += opp;
+
+        if (our > opp) bucket.wins++;
+        else if (our < opp) bucket.losses++;
+        else bucket.draws++;
+
+        bucket.diff = bucket.scored - bucket.conceded;
+        bucket.winRate = bucket.count > 0 ? (bucket.wins + 0.5 * bucket.draws) / bucket.count : 0;
+    });
+
+    return Array.from(buckets.values()).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * 年度内の月別集計（1〜12月を欠損補完して返す）
+ *
+ * @param {Array<Object>} games - 試合データ配列
+ * @param {Object} [options]
+ * @param {number} options.year - 対象年度
+ * @param {string} [options.type='all'] - 試合種別
+ * @returns {Array<Object>} 12件固定の月別サマリ
+ */
+export function aggregateMonthlySummary(games, options = {}) {
+    const { year, type = 'all' } = options;
+    const monthly = aggregateGamesByPeriod(games, { year, type, groupBy: 'month' });
+    const map = new Map(monthly.map(m => [m.month, m]));
+
+    return Array.from({ length: 12 }, (_, idx) => {
+        const month = idx + 1;
+        const existing = map.get(month);
+        if (existing) return existing;
+
+        return {
+            key: `${year}-${String(month).padStart(2, '0')}`,
+            year,
+            month,
+            label: `${month}月`,
+            type,
+            count: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            scored: 0,
+            conceded: 0,
+            diff: 0,
+            winRate: 0
+        };
+    });
+}

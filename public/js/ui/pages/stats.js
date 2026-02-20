@@ -7,9 +7,13 @@ import {
     filterGames,
     calculatePlayerStats as calcStats,
     calculateTeamSummary,
-    getAvailableYears
+    getAvailableYears,
+    aggregateGamesByPeriod,
+    aggregateMonthlySummary
 } from '../../domain/game-stats.js';
 import { resolveGameType, formatAvg, formatPercent } from '../../domain/game-utils.js';
+
+const MAX_COMPARE_PLAYERS = 3;
 
 /** 成績ページ全体を描画 */
 export function renderStatsPage() {
@@ -17,6 +21,61 @@ export function renderStatsPage() {
     renderTeamSummary();
     renderGameStatsList();
     renderPlayerStats();
+}
+
+function renderLineChartSvg(series, options = {}) {
+    if (!series.length) return '<p class="text-muted" style="font-size:12px;">データがありません</p>';
+
+    const width = options.width || 560;
+    const height = options.height || 180;
+    const pad = 24;
+    const min = options.min ?? Math.min(...series.map(p => p.value));
+    const maxRaw = options.max ?? Math.max(...series.map(p => p.value));
+    const max = maxRaw === min ? min + 1 : maxRaw;
+    const xStep = series.length > 1 ? (width - pad * 2) / (series.length - 1) : 0;
+
+    const points = series.map((p, i) => {
+        const x = pad + i * xStep;
+        const yRatio = (p.value - min) / (max - min);
+        const y = height - pad - yRatio * (height - pad * 2);
+        return { ...p, x, y };
+    });
+
+    const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+    return `
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto;">
+            <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--gray-border)" stroke-width="1" />
+            <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="var(--gray-border)" stroke-width="1" />
+            <path d="${path}" fill="none" stroke="${options.color || 'var(--accent)'}" stroke-width="2.5" stroke-linecap="round" />
+            ${points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${options.color || 'var(--accent)'}"><title>${p.label}: ${options.valueFormatter ? options.valueFormatter(p.value) : p.value}</title></circle>`).join('')}
+            ${points.map((p, i) => i % Math.ceil(points.length / 6 || 1) === 0 || i === points.length - 1
+                ? `<text x="${p.x}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${p.label}</text>`
+                : '').join('')}
+        </svg>
+    `;
+}
+
+function renderMonthlyBarChartSvg(monthly) {
+    const width = 560;
+    const height = 180;
+    const pad = 24;
+    const barW = (width - pad * 2) / monthly.length;
+
+    return `
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto;">
+            <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--gray-border)" stroke-width="1" />
+            ${monthly.map((m, i) => {
+                const h = (m.count / Math.max(...monthly.map(v => v.count), 1)) * (height - pad * 2);
+                const x = pad + i * barW + 2;
+                const y = height - pad - h;
+                return `<rect x="${x}" y="${y}" width="${Math.max(barW - 4, 2)}" height="${h}" fill="var(--accent-light)"><title>${m.label}: ${m.count}試合</title></rect>`;
+            }).join('')}
+            ${monthly.map((m, i) => i % 2 === 0
+                ? `<text x="${pad + i * barW + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${m.month}</text>`
+                : '').join('')}
+        </svg>
+    `;
 }
 
 /** 年度プルダウンを更新 */
@@ -56,7 +115,17 @@ export function switchStatsTab(tab) {
 /** チームサマリを描画 */
 export function renderTeamSummary() {
     const container = document.getElementById('team-summary-container');
+    const trendsContainer = document.getElementById('team-trends-container');
     const summaries = calculateTeamSummary(state.gameStats, { year: state.selectedYear });
+    const trendByGame = aggregateGamesByPeriod(state.gameStats, {
+        year: state.selectedYear,
+        type: state.selectedGameType,
+        groupBy: 'month'
+    });
+    const monthly = aggregateMonthlySummary(state.gameStats, {
+        year: state.selectedYear,
+        type: state.selectedGameType
+    });
 
     container.innerHTML = `
         <div class="card" style="padding: 12px;">
@@ -79,6 +148,31 @@ export function renderTeamSummary() {
                         `).join('')}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    `;
+
+    const winRateSeries = trendByGame.filter(t => t.count > 0).map(t => ({ label: t.label, value: t.winRate }));
+    const diffSeries = trendByGame.filter(t => t.count > 0).map(t => ({ label: t.label, value: t.diff }));
+
+    if (!trendsContainer) return;
+
+    trendsContainer.innerHTML = `
+        <div class="card" style="padding: 12px;">
+            <h2 class="card-title" style="margin-bottom: 8px;">時系列グラフ（軽量表示）</h2>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                <div>
+                    <p style="font-size:12px; margin-bottom:6px;">勝率推移</p>
+                    ${renderLineChartSvg(winRateSeries, { min: 0, max: 1, color: '#2f7ef7', valueFormatter: v => v.toFixed(3) })}
+                </div>
+                <div>
+                    <p style="font-size:12px; margin-bottom:6px;">得失点差推移</p>
+                    ${renderLineChartSvg(diffSeries, { color: '#19a974', valueFormatter: v => `${v >= 0 ? '+' : ''}${v}` })}
+                </div>
+                <div>
+                    <p style="font-size:12px; margin-bottom:6px;">月別試合数</p>
+                    ${renderMonthlyBarChartSvg(monthly)}
+                </div>
             </div>
         </div>
     `;
@@ -148,6 +242,8 @@ export function renderPlayerStats() {
     if (playerStats.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
         detailBody.innerHTML = '<tr><td colspan="12" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
+        const compareContainer = document.getElementById('player-compare-container');
+        if (compareContainer) compareContainer.innerHTML = '';
         return;
     }
 
@@ -189,4 +285,61 @@ export function renderPlayerStats() {
             </tr>
         `;
     }).join('');
+
+    renderPlayerComparison(playerStats);
+}
+
+function getSelectedComparePlayerIds(playerStats) {
+    const preferred = (state.comparePlayerIds || []).filter(id => playerStats.some(ps => ps.player.id === id));
+    if (preferred.length >= 2) return preferred.slice(0, MAX_COMPARE_PLAYERS);
+    return playerStats.slice(0, Math.min(2, MAX_COMPARE_PLAYERS)).map(ps => ps.player.id);
+}
+
+function renderPlayerComparison(playerStats) {
+    const container = document.getElementById('player-compare-container');
+    if (!container) return;
+
+    const selectedIds = getSelectedComparePlayerIds(playerStats);
+    state.comparePlayerIds = selectedIds;
+
+    const compared = playerStats.filter(ps => selectedIds.includes(ps.player.id));
+
+    container.innerHTML = `
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom: 8px;">選手比較（2〜3名）</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 10px;">
+                ${playerStats.map(ps => {
+                    const checked = selectedIds.includes(ps.player.id);
+                    const disabled = !checked && selectedIds.length >= MAX_COMPARE_PLAYERS;
+                    return `
+                        <label style="display:flex; align-items:center; gap:4px; font-size:12px; opacity:${disabled ? 0.55 : 1};">
+                            <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="togglePlayerCompare('${ps.player.id}', this.checked)">
+                            ${ps.player.name.split(' ')[0]}
+                        </label>
+                    `;
+                }).join('')}
+            </div>
+            ${compared.length < 2
+                ? '<p class="text-muted" style="font-size:12px;">比較する選手を2名以上選択してください。</p>'
+                : `<div style="overflow-x:auto;"><table class="stats-table"><thead><tr><th>指標</th>${compared.map(c => `<th>${c.player.name.split(' ')[0]}</th>`).join('')}</tr></thead><tbody>
+                    <tr><td>OPS</td>${compared.map(c => `<td>${formatAvg(c.stats.ops)}</td>`).join('')}</tr>
+                    <tr><td>wOBA</td>${compared.map(c => `<td>${formatAvg(c.stats.woba)}</td>`).join('')}</tr>
+                    <tr><td>K%</td>${compared.map(c => `<td>${formatPercent(c.stats.kRate)}</td>`).join('')}</tr>
+                    <tr><td>BB%</td>${compared.map(c => `<td>${formatPercent(c.stats.bbRate)}</td>`).join('')}</tr>
+                </tbody></table></div>`}
+            <p class="text-muted mt-2" style="font-size:11px;">軽量表示のため比較指標は主要4項目に限定しています。</p>
+        </div>
+    `;
+}
+
+export function togglePlayerCompare(playerId, checked) {
+    state.comparePlayerIds = state.comparePlayerIds || [];
+    if (checked) {
+        if (!state.comparePlayerIds.includes(playerId) && state.comparePlayerIds.length < MAX_COMPARE_PLAYERS) {
+            state.comparePlayerIds.push(playerId);
+        }
+    } else {
+        state.comparePlayerIds = state.comparePlayerIds.filter(id => id !== playerId);
+    }
+    renderPlayerStats();
 }

@@ -14,6 +14,13 @@ import {
 import { resolveGameType, formatAvg, formatPercent } from '../../domain/game-utils.js';
 
 const MAX_COMPARE_PLAYERS = 3;
+const PLAYER_COMPARE_METRICS = [
+    { label: 'OPS', formatter: s => formatAvg(s.ops) },
+    { label: 'wOBA', formatter: s => formatAvg(s.woba) },
+    { label: 'K%', formatter: s => formatPercent(s.kRate) },
+    { label: 'BB%', formatter: s => formatPercent(s.bbRate) },
+    { label: 'AVG', formatter: s => formatAvg(s.avg) }
+];
 
 /** 成績ページ全体を描画 */
 export function renderStatsPage() {
@@ -336,18 +343,22 @@ function renderPlayerComparison(playerStats) {
     state.comparePlayerIds = selectedIds;
 
     const compared = playerStats.filter(ps => selectedIds.includes(ps.player.id));
-    const metricRows = [
-        { label: 'OPS', formatter: s => formatAvg(s.ops) },
-        { label: 'wOBA', formatter: s => formatAvg(s.woba) },
-        { label: 'K%', formatter: s => formatPercent(s.kRate) },
-        { label: 'BB%', formatter: s => formatPercent(s.bbRate) },
-        { label: 'AVG', formatter: s => formatAvg(s.avg) }
-    ];
+    const selectionCount = compared.length;
+    const hasReachedCap = selectedIds.length >= MAX_COMPARE_PLAYERS;
+
+    let selectionMessage = '候補: 打席数が多い選手や、同じ打順の選手を選ぶと違いが見えやすくなります。';
+    if (selectionCount === 1) {
+        selectionMessage = '比較するには、もう1名以上選択してください（2〜3名）。';
+    } else if (selectionCount >= 2) {
+        selectionMessage = hasReachedCap
+            ? `比較中: ${selectionCount}名を選択中です。上限は${MAX_COMPARE_PLAYERS}名です。入れ替える場合は先に1名外してください。`
+            : `比較中: ${selectionCount}名を選択中です。さらに選択できるのはあと${MAX_COMPARE_PLAYERS - selectionCount}名です。`;
+    }
 
     container.innerHTML = `
         <div class="card">
-            <h2 class="card-title" style="margin-bottom: 8px;">選手比較（2〜3名）</h2>
-            <p class="text-muted" style="font-size:12px; margin-bottom:8px;">比較したい選手を2〜3名選択してください。</p>
+            <h2 class="card-title" style="margin-bottom: 8px;">選手比較（2〜${MAX_COMPARE_PLAYERS}名・上限${MAX_COMPARE_PLAYERS}名）</h2>
+            <p class="text-muted" style="font-size:12px; margin-bottom:8px;">比較したい選手を2〜${MAX_COMPARE_PLAYERS}名選択してください。上限は${MAX_COMPARE_PLAYERS}名です。</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 10px;">
                 ${playerStats.map(ps => {
                     const checked = selectedIds.includes(ps.player.id);
@@ -360,12 +371,10 @@ function renderPlayerComparison(playerStats) {
                     `;
                 }).join('')}
             </div>
-            ${compared.length === 0
-                ? '<p class="text-muted" style="font-size:12px;">候補: 打席数が多い選手や、同じ打順の選手を選ぶと違いが見えやすくなります。</p>'
-                : compared.length === 1
-                    ? '<p class="text-muted" style="font-size:12px;">比較するには、もう1名以上選択してください（2〜3名）。</p>'
-                    : `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-bottom:10px;">
-                        ${metricRows.map(metric => {
+            <p class="text-muted" style="font-size:12px;">${selectionMessage}</p>
+            ${selectionCount >= 2
+                ? `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin:10px 0;">
+                        ${PLAYER_COMPARE_METRICS.map(metric => {
                             const values = compared.map(c => metric.formatter(c.stats));
                             return `<div style="padding:8px; border:1px solid var(--gray-border); border-radius:8px; background:var(--gray-light);">
                                 <div style="font-size:11px; color:var(--text-muted);">${metric.label}</div>
@@ -374,8 +383,9 @@ function renderPlayerComparison(playerStats) {
                         }).join('')}
                     </div>
                     <div style="overflow-x:auto;"><table class="stats-table"><thead><tr><th>指標</th>${compared.map(c => `<th>${c.player.name.split(' ')[0]}</th>`).join('')}</tr></thead><tbody>
-                        ${metricRows.map(metric => `<tr><td>${metric.label}</td>${compared.map(c => `<td>${metric.formatter(c.stats)}</td>`).join('')}</tr>`).join('')}
-                    </tbody></table></div>`}
+                        ${PLAYER_COMPARE_METRICS.map(metric => `<tr><td>${metric.label}</td>${compared.map(c => `<td>${metric.formatter(c.stats)}</td>`).join('')}</tr>`).join('')}
+                    </tbody></table></div>`
+                : ''}
         </div>
     `;
 }
@@ -383,9 +393,15 @@ function renderPlayerComparison(playerStats) {
 export function togglePlayerCompare(playerId, checked) {
     state.comparePlayerIds = state.comparePlayerIds || [];
     if (checked) {
-        if (!state.comparePlayerIds.includes(playerId) && state.comparePlayerIds.length < MAX_COMPARE_PLAYERS) {
-            state.comparePlayerIds.push(playerId);
+        if (state.comparePlayerIds.includes(playerId)) {
+            renderPlayerStats();
+            return;
         }
+        if (state.comparePlayerIds.length >= MAX_COMPARE_PLAYERS) {
+            renderPlayerStats();
+            return;
+        }
+        state.comparePlayerIds.push(playerId);
     } else {
         state.comparePlayerIds = state.comparePlayerIds.filter(id => id !== playerId);
     }

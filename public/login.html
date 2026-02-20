@@ -276,6 +276,26 @@
         }
         .invite-deeplink-banner.show { display: block; }
 
+        .invite-status-note {
+            display: none;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        .invite-status-note.show { display: block; }
+        .invite-status-note.ok {
+            background: #e6f4ea;
+            color: #137333;
+            border: 1px solid #ceead6;
+        }
+        .invite-status-note.ng {
+            background: #fce8e6;
+            color: #a50e0e;
+            border: 1px solid #f6c7c4;
+        }
+
     </style>
 </head>
 <body>
@@ -328,6 +348,7 @@
                 <div class="choice-card">
                     <h3>招待コードで参加する</h3>
                     <input type="text" id="invite-code-first" class="form-input" placeholder="6桁の招待コード" maxlength="6">
+                    <div id="invite-status-first" class="invite-status-note"></div>
                     <div id="join-team-error-first" class="error-message"></div>
                     <button class="action-btn primary" onclick="handleJoinTeam('first')">参加する</button>
                     <p class="invite-entry-note">招待URLからアクセスすると、コードは自動入力されます。</p>
@@ -366,6 +387,7 @@
             <div class="choice-card" style="margin-top: 12px;">
                 <h3>招待コードで参加</h3>
                 <input type="text" id="invite-code-select" class="form-input" placeholder="6桁の招待コード" maxlength="6">
+                <div id="invite-status-select" class="invite-status-note"></div>
                 <div id="join-team-error-select" class="error-message"></div>
                 <button class="action-btn primary" onclick="handleJoinTeam('select')">参加する</button>
                 <p class="invite-entry-note">手入力参加も引き続き利用できます。</p>
@@ -381,8 +403,10 @@
         import {
             signInWithGoogle, checkRedirectResult, logout,
             getUserTeams, createTeam, joinTeamByInviteCode,
-            getCurrentUser
+            getCurrentUser, inspectInviteCode
         } from './js/auth.js';
+
+        let cachedInviteInspection = null;
 
         // =====================
         // 画面状態管理
@@ -425,6 +449,33 @@
             if (!el || !inviteCode) return;
             el.textContent = `招待リンクを検出しました（コード: ${inviteCode}）。そのまま「参加する」を押すとチーム参加できます。`;
             el.classList.add('show');
+        }
+
+        function formatDateTime(value) {
+            if (!value) return '-';
+            const date = value?.toDate ? value.toDate() : new Date(value);
+            if (Number.isNaN(date.getTime())) return '-';
+            return date.toLocaleString('ja-JP');
+        }
+
+        function renderInviteStatus(step, inspection) {
+            const id = step === 'first' ? 'invite-status-first' : 'invite-status-select';
+            const el = document.getElementById(id);
+            if (!el || !inspection) return;
+            const expiresAt = inspection.invite?.expiresAt;
+            const expiresText = expiresAt ? `（有効期限: ${formatDateTime(expiresAt)}）` : '';
+            el.textContent = `${inspection.message}${expiresText}`;
+            el.classList.remove('ok', 'ng');
+            el.classList.add(inspection.ok ? 'ok' : 'ng', 'show');
+        }
+
+        async function ensureInviteInspection(inviteCode) {
+            if (!inviteCode) return null;
+            if (!cachedInviteInspection || cachedInviteInspection.code !== inviteCode) {
+                const result = await inspectInviteCode(inviteCode);
+                cachedInviteInspection = { code: inviteCode, result };
+            }
+            return cachedInviteInspection.result;
         }
 
         // =====================
@@ -564,12 +615,16 @@
 
             const inviteCode = getInviteCodeFromUrl();
             syncInviteInputFields(inviteCode);
+            const inviteInspection = inviteCode ? await ensureInviteInspection(inviteCode) : null;
 
             if (teams.length === 0) {
                 showStep('step-first-login');
                 if (inviteCode) {
                     showInviteDeeplinkMessage(inviteCode, 'first');
-                    await handleJoinTeam('first', true);
+                    renderInviteStatus('first', inviteInspection);
+                    if (inviteInspection?.ok) {
+                        await handleJoinTeam('first', true);
+                    }
                 }
                 return;
             }
@@ -587,7 +642,10 @@
             showStep('step-team-select');
             if (inviteCode) {
                 showInviteDeeplinkMessage(inviteCode, 'select');
-                await handleJoinTeam('select', true);
+                renderInviteStatus('select', inviteInspection);
+                if (inviteInspection?.ok) {
+                    await handleJoinTeam('select', true);
+                }
             }
         });
 

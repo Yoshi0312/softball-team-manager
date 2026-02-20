@@ -194,21 +194,9 @@ export async function joinTeamByInviteCode(inviteCode, user) {
 
     const inviteData = inviteDoc.data();
 
-    if (!inviteData.teamId) {
-      return { success: false, error: 'invalid_code', message: '無効な招待コードです' };
-    }
-
-    if (inviteData.status === 'revoked') {
-      return { success: false, error: 'revoked', message: 'この招待リンクは無効化されています' };
-    }
-
-    if (inviteData.status === 'used' || inviteData.usedBy || inviteData.usedAt) {
-      return { success: false, error: 'already_used', message: 'この招待リンクはすでに使用されています' };
-    }
-
-    // 有効期限チェック
-    if (inviteData.expiresAt && inviteData.expiresAt.toDate() < new Date()) {
-      return { success: false, error: 'expired', message: '招待コードの有効期限が切れています' };
+    const availability = evaluateInviteAvailability(inviteData);
+    if (!availability.ok) {
+      return { success: false, error: availability.error, message: availability.message };
     }
 
     const teamId = inviteData.teamId;
@@ -259,6 +247,56 @@ export async function joinTeamByInviteCode(inviteCode, user) {
   }
 }
 
+function evaluateInviteAvailability(inviteData) {
+  if (!inviteData?.teamId) {
+    return { ok: false, error: 'invalid_code', message: '無効な招待コードです' };
+  }
+
+  if (inviteData.status === 'revoked') {
+    return { ok: false, error: 'revoked', message: 'この招待リンクは無効化されています' };
+  }
+
+  if (inviteData.status === 'used' || inviteData.usedBy || inviteData.usedAt) {
+    return { ok: false, error: 'already_used', message: 'この招待リンクはすでに使用されています' };
+  }
+
+  const expiresAtDate = inviteData.expiresAt?.toDate ? inviteData.expiresAt.toDate() : null;
+  if (expiresAtDate && expiresAtDate < new Date()) {
+    return { ok: false, error: 'expired', message: '招待コードの有効期限が切れています' };
+  }
+
+  return { ok: true, error: null, message: '' };
+}
+
+// 招待コードの状態をログイン画面で事前確認
+export async function inspectInviteCode(inviteCode) {
+  const normalizedCode = inviteCode.trim();
+  if (!normalizedCode) {
+    return { ok: false, error: 'invalid_code', message: '招待コードが指定されていません', invite: null };
+  }
+
+  const inviteRef = doc(db, 'invites', normalizedCode);
+  const inviteDoc = await getDoc(inviteRef);
+  if (!inviteDoc.exists()) {
+    return { ok: false, error: 'invalid_code', message: '無効な招待コードです', invite: null };
+  }
+
+  const inviteData = inviteDoc.data();
+  const availability = evaluateInviteAvailability(inviteData);
+  return {
+    ok: availability.ok,
+    error: availability.error,
+    message: availability.ok ? 'この招待リンクは有効です' : availability.message,
+    invite: {
+      code: normalizedCode,
+      status: inviteData.status || 'active',
+      expiresAt: inviteData.expiresAt || null,
+      usedBy: inviteData.usedBy || null,
+      usedAt: inviteData.usedAt || null
+    }
+  };
+}
+
 // 招待コードを生成（adminが使用）
 export async function createInviteCode(teamId) {
   try {
@@ -270,6 +308,7 @@ export async function createInviteCode(teamId) {
       teamId: teamId,
       createdBy: auth.currentUser.uid,
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       expiresAt: expiresAt,
       usedBy: null,
       usedAt: null,
@@ -291,7 +330,18 @@ export async function getTeamInvites(teamId) {
   const q = query(invitesRef, where('teamId', '==', teamId));
   const snapshot = await getDocs(q);
   return snapshot.docs
-    .map(d => ({ code: d.id, ...d.data() }))
+    .map(d => {
+      const data = d.data();
+      const normalizedStatus = data.status || (data.usedBy || data.usedAt ? 'used' : 'active');
+      return {
+        code: d.id,
+        ...data,
+        status: normalizedStatus,
+        usedBy: data.usedBy || null,
+        usedAt: data.usedAt || null,
+        expiresAt: data.expiresAt || null
+      };
+    })
     .sort((a, b) => {
       const aTs = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
       const bTs = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;

@@ -144,6 +144,11 @@ export async function updateEvent(teamId, eventId, eventData) {
     });
 }
 
+// MVP投票設定を更新
+export async function updateVoteSettings(teamId, eventId, voteSettings) {
+    return updateEvent(teamId, eventId, voteSettings);
+}
+
 // 出欠回答を保存（event配下attendances/{userId}）
 export async function saveAttendance(teamId, eventId, userId, attendanceData) {
     const ref = doc(db, 'teams', teamId, 'events', eventId, 'attendances', userId);
@@ -168,6 +173,22 @@ export async function getAttendancesByEvent(teamId, eventId) {
 // 回答一覧を取得（attendance向け最小API alias）
 export async function listAttendances(teamId, eventId) {
     return getAttendancesByEvent(teamId, eventId);
+}
+
+// MVP投票を保存（events/{eventId}/votes/{userId}）
+export async function saveMvpVote(teamId, eventId, userId, voteData) {
+    const ref = doc(db, 'teams', teamId, 'events', eventId, 'votes', userId);
+    await setDoc(ref, {
+        ...voteData,
+        updatedAt: serverTimestamp()
+    }, { merge: false });
+}
+
+// MVP投票一覧を取得
+export async function getMvpVotesByEvent(teamId, eventId) {
+    const ref = collection(db, 'teams', teamId, 'events', eventId, 'votes');
+    const snapshot = await getDocs(ref);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 // チームメンバー一覧を取得

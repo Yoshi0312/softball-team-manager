@@ -60,10 +60,29 @@ service cloud.firestore {
         allow read: if isTeamMember(teamId);
         allow write: if isTeamAdmin(teamId);
 
+        function isVoteWindowOpen() {
+          let event = get(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)).data;
+          let deadline = event.voteDeadline;
+          return event.voteEnabled == true
+            && event.voteLocked != true
+            && (deadline == null || request.time <= deadline);
+        }
+
         // 出欠回答: 本人のみ書き込み可
         match /attendances/{userId} {
           allow read: if isTeamMember(teamId);
           allow write: if request.auth.uid == userId;
+        }
+
+        // MVP投票: 1ユーザー1票（votes/{userId}）
+        match /votes/{userId} {
+          allow read: if isTeamMember(teamId);
+          allow create: if request.auth != null
+            && request.auth.uid == userId
+            && isTeamMember(teamId)
+            && !exists(/databases/$(database)/documents/teams/$(teamId)/events/$(eventId)/votes/$(userId))
+            && isVoteWindowOpen();
+          allow update, delete: if false;
         }
       }
 

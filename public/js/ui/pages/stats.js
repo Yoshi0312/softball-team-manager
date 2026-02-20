@@ -313,9 +313,9 @@ export function renderPlayerStats() {
 }
 
 function getSelectedComparePlayerIds(playerStats) {
-    const preferred = (state.comparePlayerIds || []).filter(id => playerStats.some(ps => ps.player.id === id));
-    if (preferred.length >= 2) return preferred.slice(0, MAX_COMPARE_PLAYERS);
-    return playerStats.slice(0, Math.min(2, MAX_COMPARE_PLAYERS)).map(ps => ps.player.id);
+    return (state.comparePlayerIds || [])
+        .filter(id => playerStats.some(ps => ps.player.id === id))
+        .slice(0, MAX_COMPARE_PLAYERS);
 }
 
 function renderPlayerComparison(playerStats) {
@@ -326,10 +326,18 @@ function renderPlayerComparison(playerStats) {
     state.comparePlayerIds = selectedIds;
 
     const compared = playerStats.filter(ps => selectedIds.includes(ps.player.id));
+    const metricRows = [
+        { label: 'OPS', formatter: s => formatAvg(s.ops) },
+        { label: 'wOBA', formatter: s => formatAvg(s.woba) },
+        { label: 'K%', formatter: s => formatPercent(s.kRate) },
+        { label: 'BB%', formatter: s => formatPercent(s.bbRate) },
+        { label: 'AVG', formatter: s => formatAvg(s.avg) }
+    ];
 
     container.innerHTML = `
         <div class="card">
             <h2 class="card-title" style="margin-bottom: 8px;">選手比較（2〜3名）</h2>
+            <p class="text-muted" style="font-size:12px; margin-bottom:8px;">比較したい選手を2〜3名選択してください。</p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 10px;">
                 ${playerStats.map(ps => {
                     const checked = selectedIds.includes(ps.player.id);
@@ -342,15 +350,22 @@ function renderPlayerComparison(playerStats) {
                     `;
                 }).join('')}
             </div>
-            ${compared.length < 2
-                ? '<p class="text-muted" style="font-size:12px;">比較する選手を2名以上選択してください。</p>'
-                : `<div style="overflow-x:auto;"><table class="stats-table"><thead><tr><th>指標</th>${compared.map(c => `<th>${c.player.name.split(' ')[0]}</th>`).join('')}</tr></thead><tbody>
-                    <tr><td>OPS</td>${compared.map(c => `<td>${formatAvg(c.stats.ops)}</td>`).join('')}</tr>
-                    <tr><td>wOBA</td>${compared.map(c => `<td>${formatAvg(c.stats.woba)}</td>`).join('')}</tr>
-                    <tr><td>K%</td>${compared.map(c => `<td>${formatPercent(c.stats.kRate)}</td>`).join('')}</tr>
-                    <tr><td>BB%</td>${compared.map(c => `<td>${formatPercent(c.stats.bbRate)}</td>`).join('')}</tr>
-                </tbody></table></div>`}
-            <p class="text-muted mt-2" style="font-size:11px;">軽量表示のため比較指標は主要4項目に限定しています。</p>
+            ${compared.length === 0
+                ? '<p class="text-muted" style="font-size:12px;">候補: 打席数が多い選手や、同じ打順の選手を選ぶと違いが見えやすくなります。</p>'
+                : compared.length === 1
+                    ? '<p class="text-muted" style="font-size:12px;">比較するには、もう1名以上選択してください（2〜3名）。</p>'
+                    : `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-bottom:10px;">
+                        ${metricRows.map(metric => {
+                            const values = compared.map(c => metric.formatter(c.stats));
+                            return `<div style="padding:8px; border:1px solid var(--gray-border); border-radius:8px; background:var(--gray-light);">
+                                <div style="font-size:11px; color:var(--text-muted);">${metric.label}</div>
+                                <div style="font-weight:600; margin-top:2px;">${values.join(' / ')}</div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <div style="overflow-x:auto;"><table class="stats-table"><thead><tr><th>指標</th>${compared.map(c => `<th>${c.player.name.split(' ')[0]}</th>`).join('')}</tr></thead><tbody>
+                        ${metricRows.map(metric => `<tr><td>${metric.label}</td>${compared.map(c => `<td>${metric.formatter(c.stats)}</td>`).join('')}</tr>`).join('')}
+                    </tbody></table></div>`}
         </div>
     `;
 }

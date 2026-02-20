@@ -14,12 +14,31 @@ import {
 import { resolveGameType, formatAvg, formatPercent } from '../../domain/game-utils.js';
 
 const MAX_COMPARE_PLAYERS = 3;
+const STAT_FALLBACK_TEXT = '—';
+const UNAVAILABLE_TEXT = '表示できません';
+
+function isFiniteNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function safeFormatAvg(value) {
+    return isFiniteNumber(value) ? formatAvg(value) : STAT_FALLBACK_TEXT;
+}
+
+function safeFormatPercent(value) {
+    return isFiniteNumber(value) ? formatPercent(value) : STAT_FALLBACK_TEXT;
+}
+
+function renderUnavailableCell() {
+    return `<span class="text-muted">${UNAVAILABLE_TEXT}</span>`;
+}
+
 const PLAYER_COMPARE_METRICS = [
-    { label: 'OPS', formatter: s => formatAvg(s.ops) },
-    { label: 'wOBA', formatter: s => formatAvg(s.woba) },
-    { label: 'K%', formatter: s => formatPercent(s.kRate) },
-    { label: 'BB%', formatter: s => formatPercent(s.bbRate) },
-    { label: 'AVG', formatter: s => formatAvg(s.avg) }
+    { label: 'OPS', formatter: s => safeFormatAvg(s.ops) },
+    { label: 'wOBA', formatter: s => safeFormatAvg(s.woba) },
+    { label: 'K%', formatter: s => safeFormatPercent(s.kRate) },
+    { label: 'BB%', formatter: s => safeFormatPercent(s.bbRate) },
+    { label: 'AVG', formatter: s => safeFormatAvg(s.avg) }
 ];
 
 /** 成績ページ全体を描画 */
@@ -160,7 +179,7 @@ export function renderTeamSummary() {
                             <tr>
                                 <td>${s.label}</td><td>${s.count}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.draws}</td>
                                 <td>${s.scored}</td><td>${s.conceded}</td><td>${s.diff >= 0 ? '+' : ''}${s.diff}</td>
-                                <td>${s.winRate !== null ? s.winRate.toFixed(3) : '-'}</td>
+                                <td>${isFiniteNumber(s.winRate) ? s.winRate.toFixed(3) : renderUnavailableCell()}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -246,8 +265,8 @@ export function renderGameStatsList() {
             <div class="game-stat-item" onclick="openGameStatModal('${g.id}')">
                 <div class="game-stat-score ${scoreClass}">${ourScore}-${oppScore}</div>
                 <div class="game-stat-info">
-                    <div class="game-stat-title">vs ${g.opponent || '未設定'}</div>
-                    <div class="game-stat-meta">${g.date} ${g.tournament || ''} <span style="background:var(--gray-light);padding:1px 6px;border-radius:4px;font-size:11px;">${(GAME_TYPES[resolveGameType(g)] || {}).label || '練習試合'}</span></div>
+                    <div class="game-stat-title">vs ${g.opponent || STAT_FALLBACK_TEXT}</div>
+                    <div class="game-stat-meta">${g.date || STAT_FALLBACK_TEXT} ${g.tournament || STAT_FALLBACK_TEXT} <span style="background:var(--gray-light);padding:1px 6px;border-radius:4px;font-size:11px;">${(GAME_TYPES[resolveGameType(g)] || {}).label || '練習試合'}</span></div>
                 </div>
                 <button class="icon-btn danger" onclick="event.stopPropagation(); deleteGameStatConfirm('${g.id}')" title="削除">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -296,11 +315,11 @@ export function renderPlayerStats() {
                 <td>${s.games}</td>
                 <td>${s.atBats}</td>
                 <td>${s.hits}</td>
-                <td class="highlight">${formatAvg(s.avg)}</td>
-                <td>${formatAvg(s.obp)}</td>
-                <td>${formatAvg(s.slg)}</td>
-                <td>${formatAvg(s.ops)}</td>
-                <td class="highlight woba-col">${formatAvg(s.woba)}</td>
+                <td class="highlight">${safeFormatAvg(s.avg)}</td>
+                <td>${safeFormatAvg(s.obp)}</td>
+                <td>${safeFormatAvg(s.slg)}</td>
+                <td>${safeFormatAvg(s.ops)}</td>
+                <td class="highlight woba-col">${safeFormatAvg(s.woba)}</td>
             </tr>
         `;
     }).join('');
@@ -318,10 +337,10 @@ export function renderPlayerStats() {
                 <td>${s.walks}</td>
                 <td>${s.strikeouts}</td>
                 <td>${s.sacrifices}</td>
-                <td class="highlight">${formatAvg(s.iso)}</td>
-                <td>${formatAvg(s.babip)}</td>
-                <td>${formatPercent(s.kRate)}</td>
-                <td>${formatPercent(s.bbRate)}</td>
+                <td class="highlight">${safeFormatAvg(s.iso)}</td>
+                <td>${safeFormatAvg(s.babip)}</td>
+                <td>${safeFormatPercent(s.kRate)}</td>
+                <td>${safeFormatPercent(s.bbRate)}</td>
             </tr>
         `;
     }).join('');

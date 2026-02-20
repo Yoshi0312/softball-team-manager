@@ -10,6 +10,7 @@ export const state = {
     templates: [],
     gameStats: [],
     events: [],
+    accountingEntries: [],
     teamMembers: [],
     settings: {
         teamName: '',

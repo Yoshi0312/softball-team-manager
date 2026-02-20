@@ -40,6 +40,7 @@ import {
     switchPreviewTab, downloadAsImage
 } from './ui/pages/lineup.js';
 import { renderSavedList, renderSavedLineups, renderSavedTemplates, switchSavedTab } from './ui/pages/saved.js';
+import { renderAccountingPage, changeAccountingMonth, saveAccountingEntry, deleteAccounting } from './ui/pages/accounting.js';
 import {
     renderStatsPage, updateYearSelector, changeStatsYear, changeStatsGameType,
     switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy, togglePlayerCompare
@@ -77,6 +78,7 @@ function showPageWithRender(pageId) {
     if (pageId === 'attendance') renderAttendancePage();
     if (pageId === 'stats') renderStatsPage();
     if (pageId === 'saved') renderSavedList();
+    if (pageId === 'accounting') renderAccountingPage();
     if (pageId === 'settings') loadSettings();
 }
 
@@ -91,6 +93,7 @@ export async function loadData() {
         state.templates = data.templates || [];
         state.gameStats = data.gameStats || [];
         state.events = data.events || [];
+        state.accountingEntries = data.accountingEntries || [];
         state.teamMembers = data.teamMembers || [];
         state.settings = data.settings || state.settings;
         console.log('Firestoreからデータ読み込み完了:', {
@@ -99,6 +102,7 @@ export async function loadData() {
             templates: state.templates.length,
             gameStats: state.gameStats.length,
             events: state.events.length,
+            accountingEntries: state.accountingEntries.length,
             teamMembers: state.teamMembers.length
         });
     } catch (e) {
@@ -140,6 +144,8 @@ export {
     switchPreviewTab, downloadAsImage,
     // saved
     renderSavedList, renderSavedLineups, renderSavedTemplates, switchSavedTab,
+    // accounting
+    renderAccountingPage, changeAccountingMonth, saveAccountingEntry, deleteAccounting,
     // stats
     renderStatsPage, updateYearSelector, changeStatsYear, changeStatsGameType,
     switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy, togglePlayerCompare,

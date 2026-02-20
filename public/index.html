@@ -158,6 +158,9 @@
 
         <div class="card">
             <h2 class="card-title">スターティングメンバー</h2>
+            <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+                <button class="btn btn-secondary btn-sm" onclick="suggestLineupRecommendation()">おすすめ打順を作成</button>
+            </div>
             <div style="overflow-x: auto;">
                 <table class="lineup-table">
                     <thead>
@@ -177,6 +180,7 @@
             <p class="text-muted mt-2" style="font-size: 12px;">
                 黄色: 左打 / 緑: 両打 / ◎: メインポジション / ○: サブポジション
             </p>
+            <div id="lineup-recommendation-preview" class="lineup-recommendation-preview mt-2"></div>
         </div>
 
         <div class="card">
@@ -1016,6 +1020,7 @@
             'startNewLineup', 'toggleDPRows', 'updateStarterPosition', 'updateStarterPlayer',
             'updateReserve', 'addReserveSlot', 'saveLineup', 'saveAsTemplate',
             'loadLineup', 'deleteLineup', 'previewLineup', 'switchPreviewTab',
+            'suggestLineupRecommendation', 'applyLineupRecommendation', 'discardLineupRecommendation',
             'downloadAsImage', 'switchSavedTab', 'switchStatsTab',
             'changeStatsYear', 'changeStatsGameType', 'changeStatsSortBy',
             'openLineupSelectModal', 'closeLineupSelectModal',

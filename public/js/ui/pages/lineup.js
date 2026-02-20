@@ -5,12 +5,17 @@ import { state, reserveCount, incrementReserveCount } from '../state.js';
 import { POSITIONS, FIELD_POSITIONS } from '../../constants.js';
 import * as DB from '../../db.js';
 import { generateId, getPositionFit, getBattingLabel } from '../../domain/game-utils.js';
+import { calculatePlayerStats } from '../../domain/game-stats.js';
+import { buildRecommendedLineup } from '../../domain/lineup-recommender.js';
 import { showConfirm } from '../modals/confirmModal.js';
 import { alertFirestoreWriteError, alertStandardizedWriteError } from '../alerts.js';
 import { renderSavedList } from './saved.js';
 
+let lineupRecommendationCandidate = null;
+
 /** 新規メンバー表を初期化 */
 export function startNewLineup() {
+    clearRecommendationCandidate({ rerender: false });
     state.editingLineupId = null;
     state.currentLineup = {
         id: generateId(),
@@ -51,6 +56,7 @@ export function renderLineupForm() {
 
     renderLineupTable();
     renderReserves();
+    renderRecommendationPreview();
 }
 
 /** スターター表を描画 */
@@ -105,6 +111,7 @@ export function updateStarterPosition(order, position) {
             state.currentLineup.starters[order] = { order: order + 1, position: null, playerId: null };
         }
         state.currentLineup.starters[order].position = position ? parseInt(position) : null;
+        clearRecommendationCandidate();
         renderLineupTable();
     }
 }
@@ -116,13 +123,119 @@ export function updateStarterPlayer(order, playerId) {
             state.currentLineup.starters[order] = { order: order + 1, position: null, playerId: null };
         }
         state.currentLineup.starters[order].playerId = playerId || null;
+        clearRecommendationCandidate();
         renderLineupTable();
     }
 }
 
 /** DPロー切替 */
 export function toggleDPRows() {
+    clearRecommendationCandidate();
     renderLineupTable();
+}
+
+function collectPlayerMetrics(playerIds) {
+    const metrics = {};
+    playerIds.forEach((playerId) => {
+        metrics[playerId] = calculatePlayerStats(state.gameStats, playerId);
+    });
+    return metrics;
+}
+
+function clearRecommendationCandidate({ rerender = true } = {}) {
+    lineupRecommendationCandidate = null;
+    if (rerender) renderRecommendationPreview();
+}
+
+function renderComparisonTableRows(comparison) {
+    return comparison.map((row) => {
+        const player = state.players.find(p => p.id === row.playerId);
+        const before = row.currentOrder;
+        const after = row.recommendedOrder;
+        return `
+            <tr class="${row.changed ? 'lineup-rec-changed' : ''}">
+                <td>${player?.number || '-'}</td>
+                <td style="text-align:left;">${player?.name || '不明な選手'}</td>
+                <td>${before}</td>
+                <td>${after}</td>
+                <td>${row.ops.toFixed(3)}</td>
+                <td>${row.woba.toFixed(3)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+export function renderRecommendationPreview() {
+    const container = document.getElementById('lineup-recommendation-preview');
+    if (!container) return;
+
+    if (!lineupRecommendationCandidate) {
+        container.innerHTML = '<p class="text-muted" style="font-size:12px; margin: 0;">OPS/wOBA ベースで候補打順を作成できます（現在の並びは変更されません）。</p>';
+        return;
+    }
+
+    const { comparison, changedCount } = lineupRecommendationCandidate;
+    container.innerHTML = `
+        <div class="lineup-rec-summary">
+            <strong>提案プレビュー</strong>
+            <span class="text-muted">${changedCount}人の打順が変更候補です</span>
+        </div>
+        <div style="overflow-x:auto; margin-top:8px;">
+            <table class="lineup-table lineup-rec-table">
+                <thead>
+                    <tr>
+                        <th>背番号</th>
+                        <th>選手</th>
+                        <th>現在</th>
+                        <th>提案</th>
+                        <th>OPS</th>
+                        <th>wOBA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${renderComparisonTableRows(comparison)}
+                </tbody>
+            </table>
+        </div>
+        <div class="lineup-rec-actions">
+            <button class="btn btn-primary btn-sm" onclick="applyLineupRecommendation()">この候補を適用</button>
+            <button class="btn btn-secondary btn-sm" onclick="discardLineupRecommendation()">候補を破棄</button>
+        </div>
+    `;
+}
+
+export function suggestLineupRecommendation() {
+    if (!state.currentLineup) return;
+
+    const starters = state.currentLineup.starters || [];
+    const playerIds = starters
+        .filter(s => s?.playerId && s?.order && s.order <= 9)
+        .map(s => s.playerId);
+
+    if (playerIds.length < 2) {
+        alert('打順候補を作成するには、2名以上の先発選手を選択してください');
+        return;
+    }
+
+    const metrics = collectPlayerMetrics(playerIds);
+    lineupRecommendationCandidate = buildRecommendedLineup(starters, metrics);
+
+    if (lineupRecommendationCandidate.changedCount === 0) {
+        alert('現在の打順が提案ロジックと一致しています');
+    }
+    renderRecommendationPreview();
+}
+
+export function applyLineupRecommendation() {
+    if (!state.currentLineup || !lineupRecommendationCandidate) return;
+    state.currentLineup.starters = lineupRecommendationCandidate.recommendedStarters.map(s => ({ ...s }));
+    clearRecommendationCandidate({ rerender: false });
+    renderLineupTable();
+    renderRecommendationPreview();
+}
+
+export function discardLineupRecommendation() {
+    clearRecommendationCandidate();
 }
 
 /** 控え選手を描画 */
@@ -235,6 +348,7 @@ export function saveAsTemplate() {
  * ※ showPage は app.js のラッパー経由で呼ぶため window.showPage を使う
  */
 export function loadLineup(lineupId, isTemplate = false) {
+    clearRecommendationCandidate({ rerender: false });
     const source = isTemplate ? state.templates : state.lineups;
     const lineup = source.find(l => l.id === lineupId);
 

@@ -374,6 +374,8 @@ function sanitizeForFilename(value, fallback = 'unknown') {
     return cleaned || fallback;
 }
 
+const IMAGE_SAVE_ERROR_MESSAGE = '画像の保存に失敗しました。通信状態をご確認のうえ、プレビューを開き直してから再度お試しください。';
+
 /** プレビュー内で現在表示中のカードを取得 */
 function getActivePreviewTarget() {
     const table = document.getElementById('preview-table');
@@ -387,12 +389,12 @@ function getActivePreviewTarget() {
 export async function downloadAsImage() {
     const target = getActivePreviewTarget();
     if (!target) {
-        alert('保存対象のプレビューが見つかりませんでした。');
+        alert(IMAGE_SAVE_ERROR_MESSAGE);
         return;
     }
 
     if (!window.html2canvas) {
-        alert('画像化ライブラリの読み込みに失敗しました。通信状況をご確認のうえ再度お試しください。');
+        alert(IMAGE_SAVE_ERROR_MESSAGE);
         return;
     }
 
@@ -413,7 +415,7 @@ export async function downloadAsImage() {
         if (!blob) throw new Error('Blobの生成に失敗しました');
 
         const imageFile = new File([blob], fileName, { type: 'image/png' });
-        const canUseShare = !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [imageFile] });
+        const canUseShare = !!navigator.share && (!navigator.canShare || navigator.canShare({ files: [imageFile] }));
 
         if (canUseShare) {
             await navigator.share({
@@ -432,18 +434,10 @@ export async function downloadAsImage() {
         link.click();
         link.remove();
 
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-            const popup = window.open(imageUrl, '_blank', 'noopener,noreferrer');
-            if (popup) {
-                alert('画像を新しいタブで開きました。長押しで「写真に保存」を選択してください。');
-            }
-        }
-
         setTimeout(() => URL.revokeObjectURL(imageUrl), 10000);
     } catch (error) {
         if (error?.name === 'AbortError') return;
         console.error('画像保存エラー:', error);
-        alert('画像の保存に失敗しました。もう一度お試しください。');
+        alert(IMAGE_SAVE_ERROR_MESSAGE);
     }
 }

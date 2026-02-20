@@ -359,8 +359,9 @@
     <!-- Stats Page -->
     <div id="page-stats" class="page">
         <div class="tabs">
-            <div class="tab active" onclick="switchStatsTab('games')">試合成績</div>
-            <div class="tab" onclick="switchStatsTab('players')">選手別統計</div>
+            <div class="tab active" data-stats-tab="games" onclick="switchStatsTab('games')">試合成績</div>
+            <div class="tab" data-stats-tab="players" onclick="switchStatsTab('players')">選手別統計</div>
+            <div class="tab" data-stats-tab="dashboard" onclick="switchStatsTab('dashboard')">ダッシュボード</div>
         </div>
 
         <!-- Year Selector -->
@@ -380,9 +381,34 @@
             </div>
         </div>
 
-        <!-- Team Summary -->
-        <div id="team-summary-container"></div>
-        <div id="team-trends-container"></div>
+        <!-- Dashboard -->
+        <div id="stats-dashboard" style="display: none;">
+            <div id="team-summary-container"></div>
+
+            <div id="dashboard-empty" class="empty-state" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 3v18h18"/>
+                    <path d="M7 15l3-4 3 2 4-6"/>
+                </svg>
+                <p id="dashboard-empty-title">表示できる成績データがありません</p>
+                <p id="dashboard-empty-description" class="text-muted mt-2" style="font-size: 13px;">年度・種別を変更して再度お試しください。</p>
+            </div>
+
+            <div class="card" style="padding: 12px;">
+                <h2 class="card-title" style="margin-bottom: 8px;">戦績推移</h2>
+                <div id="dashboard-trend-chart-container"></div>
+            </div>
+
+            <div class="card" style="padding: 12px;">
+                <h2 class="card-title" style="margin-bottom: 8px;">得失点差</h2>
+                <div id="dashboard-run-diff-chart-container"></div>
+            </div>
+
+            <div class="card" style="padding: 12px;">
+                <h2 class="card-title" style="margin-bottom: 8px;">月別成績</h2>
+                <div id="dashboard-monthly-chart-container"></div>
+            </div>
+        </div>
 
         <!-- Games List -->
         <div id="stats-games">

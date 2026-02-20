@@ -630,8 +630,9 @@
             }
 
             const forceTeamSelect = shouldForceTeamSelect();
-            if (teams.length === 1 && !forceTeamSelect) {
-                // チームが1つだけで、明示的な選択要求がない場合のみ自動選択
+            const hasInviteDeeplink = Boolean(inviteCode);
+            if (teams.length === 1 && !forceTeamSelect && !hasInviteDeeplink) {
+                // チームが1つだけで、明示的な選択要求・招待リンク遷移がない場合のみ自動選択
                 selectTeam(teams[0].teamId);
                 return;
             }

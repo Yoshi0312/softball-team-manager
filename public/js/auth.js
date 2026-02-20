@@ -260,12 +260,28 @@ function evaluateInviteAvailability(inviteData) {
     return { ok: false, error: 'already_used', message: 'この招待リンクはすでに使用されています' };
   }
 
-  const expiresAtDate = inviteData.expiresAt?.toDate ? inviteData.expiresAt.toDate() : null;
+  const expiresAtDate = parseInviteDate(inviteData.expiresAt);
   if (expiresAtDate && expiresAtDate < new Date()) {
     return { ok: false, error: 'expired', message: '招待コードの有効期限が切れています' };
   }
 
   return { ok: true, error: null, message: '' };
+}
+
+function parseInviteDate(value) {
+  if (!value) return null;
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function normalizeInviteData(rawInvite = {}) {
+  return {
+    ...rawInvite,
+    status: rawInvite.status || (rawInvite.usedBy || rawInvite.usedAt ? 'used' : 'active'),
+    expiresAt: rawInvite.expiresAt || null,
+    usedBy: rawInvite.usedBy || null,
+    usedAt: rawInvite.usedAt || null
+  };
 }
 
 // 招待コードの状態をログイン画面で事前確認
@@ -281,19 +297,13 @@ export async function inspectInviteCode(inviteCode) {
     return { ok: false, error: 'invalid_code', message: '無効な招待コードです', invite: null };
   }
 
-  const inviteData = inviteDoc.data();
+  const inviteData = normalizeInviteData(inviteDoc.data());
   const availability = evaluateInviteAvailability(inviteData);
   return {
     ok: availability.ok,
     error: availability.error,
     message: availability.ok ? 'この招待リンクは有効です' : availability.message,
-    invite: {
-      code: normalizedCode,
-      status: inviteData.status || 'active',
-      expiresAt: inviteData.expiresAt || null,
-      usedBy: inviteData.usedBy || null,
-      usedAt: inviteData.usedAt || null
-    }
+    invite: { code: normalizedCode, ...inviteData }
   };
 }
 
@@ -331,15 +341,10 @@ export async function getTeamInvites(teamId) {
   const snapshot = await getDocs(q);
   return snapshot.docs
     .map(d => {
-      const data = d.data();
-      const normalizedStatus = data.status || (data.usedBy || data.usedAt ? 'used' : 'active');
+      const data = normalizeInviteData(d.data());
       return {
         code: d.id,
         ...data,
-        status: normalizedStatus,
-        usedBy: data.usedBy || null,
-        usedAt: data.usedAt || null,
-        expiresAt: data.expiresAt || null
       };
     })
     .sort((a, b) => {

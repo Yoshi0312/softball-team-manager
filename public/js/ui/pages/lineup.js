@@ -357,8 +357,9 @@ export function renderFieldDiagram() {
 
 /** プレビュータブ切替 */
 export function switchPreviewTab(tab) {
-    document.querySelectorAll('#page-preview .tab').forEach(t => t.classList.remove('active'));
-    event.target.classList.add('active');
+    document.querySelectorAll('#page-preview [data-preview-tab]').forEach(t => {
+        t.classList.toggle('active', t.dataset.previewTab === tab);
+    });
 
     document.getElementById('preview-table').style.display = tab === 'table' ? 'block' : 'none';
     document.getElementById('preview-field').style.display = tab === 'field' ? 'block' : 'none';

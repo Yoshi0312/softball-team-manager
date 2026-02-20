@@ -966,6 +966,43 @@ select.form-control {
     color: var(--danger);
 }
 
+
+.metric-tooltip {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(26, 115, 232, 0.12);
+    cursor: help;
+    position: relative;
+}
+
+.metric-tooltip:hover::after,
+.metric-tooltip:focus-visible::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 6px 8px;
+    border-radius: 6px;
+    min-width: 180px;
+    max-width: 240px;
+    z-index: 30;
+    white-space: normal;
+    text-align: left;
+}
+
 /* Utility */
 .text-center {
     text-align: center;

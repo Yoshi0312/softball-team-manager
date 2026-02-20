@@ -47,6 +47,13 @@ const PLAYER_COMPARE_METRICS = [
     { label: 'AVG', formatter: s => safeFormatAvg(s.avg) }
 ];
 
+const METRIC_TOOLTIPS = {
+    OPS: 'OPS = 出塁率 + 長打率。出塁力と長打力をまとめて評価する代表指標です。',
+    wOBA: 'wOBA = 打撃結果ごとに重みをつけた出塁率。単打/長打/四球の価値差を反映します。',
+    'K%': 'K% = 三振 ÷ 打席。低いほど三振しにくい傾向を示します。',
+    'BB%': 'BB% = 四球 ÷ 打席。高いほど選球眼が良い傾向を示します。'
+};
+
 
 let selectedVoteEventId = null;
 let selectedOpponentFilter = 'all';
@@ -151,6 +158,158 @@ function renderMonthlyBarChartSvg(series) {
             ${series.map((point, i) => i % 2 === 0
                 ? `<text x="${pad + i * barW + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${point.label}</text>`
                 : '').join('')}
+        </svg>
+    `;
+}
+
+function renderMonthlyBreakdownChartSvg(monthlyRows) {
+    if (!monthlyRows.length) return '<p class="text-muted" style="font-size:12px;">データがありません</p>';
+
+    const width = 560;
+    const height = 210;
+    const pad = 24;
+    const barW = (width - pad * 2) / monthlyRows.length;
+    const maxGames = Math.max(...monthlyRows.map(row => row.count), 1);
+
+    return `
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto;">
+            <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--gray-border)" stroke-width="1" />
+            ${monthlyRows.map((row, i) => {
+                const x = pad + i * barW + 4;
+                const w = Math.max(barW - 8, 4);
+                const usableH = height - pad * 2;
+                const unit = row.count > 0 ? usableH / maxGames : 0;
+                const winH = row.wins * unit;
+                const drawH = row.draws * unit;
+                const lossH = row.losses * unit;
+                const baseY = height - pad;
+                return `
+                    <g>
+                        <rect x="${x}" y="${baseY - winH}" width="${w}" height="${winH}" fill="#27ae60"><title>${row.label} 勝: ${row.wins}</title></rect>
+                        <rect x="${x}" y="${baseY - winH - drawH}" width="${w}" height="${drawH}" fill="#f39c12"><title>${row.label} 分: ${row.draws}</title></rect>
+                        <rect x="${x}" y="${baseY - winH - drawH - lossH}" width="${w}" height="${lossH}" fill="#e74c3c"><title>${row.label} 敗: ${row.losses}</title></rect>
+                    </g>
+                `;
+            }).join('')}
+            ${monthlyRows.map((row, i) => i % 2 === 0
+                ? `<text x="${pad + i * barW + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${row.label}</text>`
+                : '').join('')}
+        </svg>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:11px; color:var(--gray);">
+            <span><span style="display:inline-block; width:10px; height:10px; background:#27ae60; border-radius:2px;"></span> 勝</span>
+            <span><span style="display:inline-block; width:10px; height:10px; background:#f39c12; border-radius:2px;"></span> 分</span>
+            <span><span style="display:inline-block; width:10px; height:10px; background:#e74c3c; border-radius:2px;"></span> 敗</span>
+        </div>
+    `;
+}
+
+function renderOpponentTrendChartSvg(filteredGames, selectedOpponent = 'all') {
+    const games = filteredGames
+        .filter(g => selectedOpponent === 'all' || String(g.opponent || '不明').trim() === selectedOpponent)
+        .filter(g => g.date)
+        .map(g => ({ ...g, __date: new Date(g.date) }))
+        .filter(g => !Number.isNaN(g.__date.getTime()))
+        .sort((a, b) => a.__date - b.__date);
+
+    if (!games.length) return '<p class="text-muted" style="font-size:12px;">トレンドを表示できる試合がありません。</p>';
+
+    let winPoint = 0;
+    const series = games.map((game, index) => {
+        const our = game.ourScore || 0;
+        const opp = game.opponentScore || 0;
+        if (our > opp) winPoint += 1;
+        else if (our === opp) winPoint += 0.5;
+        return {
+            label: `${game.__date.getMonth() + 1}/${game.__date.getDate()}`,
+            value: winPoint / (index + 1)
+        };
+    });
+
+    return renderLineChartSvg(series, {
+        min: 0,
+        max: 1,
+        color: '#9b59b6',
+        valueFormatter: v => v.toFixed(3)
+    });
+}
+
+function metricLabelWithTooltip(label) {
+    const tooltip = METRIC_TOOLTIPS[label];
+    if (!tooltip) return label;
+    return `${label}<span class="metric-tooltip" tabindex="0" aria-label="${tooltip}" data-tooltip="${tooltip}">?</span>`;
+}
+
+function renderPlayerRadarChartSvg(compared) {
+    const size = 360;
+    const center = size / 2;
+    const radius = 120;
+    const metrics = [
+        { key: 'ops', label: 'OPS', max: 2 },
+        { key: 'woba', label: 'wOBA', max: 1 },
+        { key: 'avg', label: 'AVG', max: 0.6 },
+        { key: 'bbRate', label: 'BB%', max: 0.3 },
+        { key: 'kRate', label: 'K%', max: 0.5, invert: true }
+    ];
+    const colors = ['#1a73e8', '#34a853', '#fbbc05'];
+
+    const grid = [0.2, 0.4, 0.6, 0.8, 1].map(level => {
+        const points = metrics.map((_, i) => {
+            const angle = -Math.PI / 2 + (Math.PI * 2 * i) / metrics.length;
+            return `${center + Math.cos(angle) * radius * level},${center + Math.sin(angle) * radius * level}`;
+        }).join(' ');
+        return `<polygon points="${points}" fill="none" stroke="var(--border)" stroke-width="1" />`;
+    }).join('');
+
+    const axis = metrics.map((metric, i) => {
+        const angle = -Math.PI / 2 + (Math.PI * 2 * i) / metrics.length;
+        const x = center + Math.cos(angle) * (radius + 18);
+        const y = center + Math.sin(angle) * (radius + 18);
+        const lx = center + Math.cos(angle) * radius;
+        const ly = center + Math.sin(angle) * radius;
+        return `<line x1="${center}" y1="${center}" x2="${lx}" y2="${ly}" stroke="var(--border)" stroke-width="1" /><text x="${x}" y="${y}" font-size="10" text-anchor="middle" fill="var(--gray)">${metric.label}</text>`;
+    }).join('');
+
+    const polygons = compared.map((entry, idx) => {
+        const points = metrics.map((metric, i) => {
+            const raw = entry.stats[metric.key] || 0;
+            const normalized = Math.max(0, Math.min(1, metric.invert ? 1 - (raw / metric.max) : raw / metric.max));
+            const angle = -Math.PI / 2 + (Math.PI * 2 * i) / metrics.length;
+            return `${center + Math.cos(angle) * radius * normalized},${center + Math.sin(angle) * radius * normalized}`;
+        }).join(' ');
+        const color = colors[idx % colors.length];
+        return `<polygon points="${points}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2"><title>${entry.player.name}</title></polygon>`;
+    }).join('');
+
+    return `<svg viewBox="0 0 ${size} ${size}" style="width:100%; max-width:360px; height:auto; margin:auto; display:block;">${grid}${axis}${polygons}</svg>`;
+}
+
+function renderPlayerScatterChartSvg(compared) {
+    const width = 520;
+    const height = 260;
+    const pad = 30;
+    const colors = ['#1a73e8', '#34a853', '#fbbc05'];
+
+    const points = compared.map((entry, idx) => ({
+        label: entry.player.name.split(' ')[0],
+        x: entry.stats.ops || 0,
+        y: entry.stats.woba || 0,
+        color: colors[idx % colors.length]
+    }));
+
+    const xMax = Math.max(0.6, ...points.map(p => p.x), 1.2);
+    const yMax = Math.max(0.3, ...points.map(p => p.y), 0.6);
+
+    return `
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto;">
+            <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--border)" />
+            <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="var(--border)" />
+            <text x="${width / 2}" y="${height - 6}" text-anchor="middle" font-size="10" fill="var(--gray)">OPS</text>
+            <text x="12" y="${height / 2}" text-anchor="middle" font-size="10" fill="var(--gray)" transform="rotate(-90 12 ${height / 2})">wOBA</text>
+            ${points.map(point => {
+                const cx = pad + (point.x / xMax) * (width - pad * 2);
+                const cy = height - pad - (point.y / yMax) * (height - pad * 2);
+                return `<circle cx="${cx}" cy="${cy}" r="6" fill="${point.color}"><title>${point.label} OPS:${point.x.toFixed(3)} / wOBA:${point.y.toFixed(3)}</title></circle><text x="${cx + 8}" y="${cy - 8}" font-size="10" fill="var(--gray-dark)">${point.label}</text>`;
+            }).join('')}
         </svg>
     `;
 }
@@ -338,6 +497,8 @@ export function renderTeamSummary() {
     const trendContainer = document.getElementById('dashboard-trend-chart-container');
     const runDiffContainer = document.getElementById('dashboard-run-diff-chart-container');
     const monthlyContainer = document.getElementById('dashboard-monthly-chart-container');
+    const monthlyBreakdownContainer = document.getElementById('dashboard-monthly-breakdown-container');
+    const opponentTrendContainer = document.getElementById('dashboard-opponent-trend-chart-container');
     const chartPanels = document.getElementById('dashboard-chart-panels');
     const emptyContainer = document.getElementById('dashboard-empty');
     const emptyTitle = document.getElementById('dashboard-empty-title');
@@ -403,6 +564,8 @@ export function renderTeamSummary() {
         trendContainer.innerHTML = '';
         runDiffContainer.innerHTML = '';
         monthlyContainer.innerHTML = '';
+        if (monthlyBreakdownContainer) monthlyBreakdownContainer.innerHTML = '';
+        if (opponentTrendContainer) opponentTrendContainer.innerHTML = '';
         if (opponentFilter) opponentFilter.innerHTML = '<option value="all">全ての対戦相手</option>';
         if (opponentContainer) {
             opponentContainer.innerHTML = `<p class="text-muted" style="padding:12px;">${buildStatsEmptyDescription()}</p>`;
@@ -426,6 +589,14 @@ export function renderTeamSummary() {
     monthlyContainer.innerHTML = monthlySeries.length > 0
         ? renderMonthlyBarChartSvg(monthlySeries)
         : '<p class="text-muted" style="font-size:12px;">月別成績を表示するデータがありません。</p>';
+    if (monthlyBreakdownContainer) {
+        monthlyBreakdownContainer.innerHTML = monthly.length > 0
+            ? renderMonthlyBreakdownChartSvg(monthly.filter(m => m.count > 0))
+            : '<p class="text-muted" style="font-size:12px;">月別勝敗内訳を表示するデータがありません。</p>';
+    }
+    if (opponentTrendContainer) {
+        opponentTrendContainer.innerHTML = renderOpponentTrendChartSvg(filteredGames, selectedOpponentFilter);
+    }
 
     renderOpponentAnalysis();
 }
@@ -454,6 +625,15 @@ function renderOpponentAnalysis() {
     const visibleRows = selectedOpponentFilter === 'all'
         ? rows
         : rows.filter(r => r.opponent === selectedOpponentFilter);
+
+    const opponentTrendContainer = document.getElementById('dashboard-opponent-trend-chart-container');
+    const filteredGames = filterGames(state.gameStats, {
+        year: state.selectedYear,
+        type: state.selectedGameType
+    });
+    if (opponentTrendContainer) {
+        opponentTrendContainer.innerHTML = renderOpponentTrendChartSvg(filteredGames, selectedOpponentFilter);
+    }
 
     container.innerHTML = `
         <div style="overflow-x:auto;">
@@ -646,14 +826,27 @@ function renderPlayerComparison(playerStats) {
                         ${PLAYER_COMPARE_METRICS.map(metric => {
                             const values = compared.map(c => metric.formatter(c.stats));
                             return `<div style="padding:8px; border:1px solid var(--gray-border); border-radius:8px; background:var(--gray-light);">
-                                <div style="font-size:11px; color:var(--text-muted);">${metric.label}</div>
+                                <div style="font-size:11px; color:var(--text-muted);">${metricLabelWithTooltip(metric.label)}</div>
                                 <div style="font-weight:600; margin-top:2px;">${values.join(' / ')}</div>
                             </div>`;
                         }).join('')}
                     </div>
                     <div style="overflow-x:auto;"><table class="stats-table"><thead><tr><th>指標</th>${compared.map(c => `<th>${c.player.name.split(' ')[0]}</th>`).join('')}</tr></thead><tbody>
-                        ${PLAYER_COMPARE_METRICS.map(metric => `<tr><td>${metric.label}</td>${compared.map(c => `<td>${metric.formatter(c.stats)}</td>`).join('')}</tr>`).join('')}
-                    </tbody></table></div>`
+                        ${PLAYER_COMPARE_METRICS.map(metric => `<tr><td>${metricLabelWithTooltip(metric.label)}</td>${compared.map(c => `<td>${metric.formatter(c.stats)}</td>`).join('')}</tr>`).join('')}
+                    </tbody></table></div>
+                    <details style="margin-top:10px;">
+                        <summary style="cursor:pointer; font-size:12px; font-weight:600;">視覚比較を開く（レーダー / 散布図）</summary>
+                        <div style="margin-top:10px; display:grid; gap:12px;">
+                            <div style="padding:8px; border:1px solid var(--border); border-radius:8px;">
+                                <div style="font-size:12px; font-weight:600; margin-bottom:8px;">レーダー比較</div>
+                                ${renderPlayerRadarChartSvg(compared)}
+                            </div>
+                            <div style="padding:8px; border:1px solid var(--border); border-radius:8px;">
+                                <div style="font-size:12px; font-weight:600; margin-bottom:8px;">散布図（OPS × wOBA）</div>
+                                ${renderPlayerScatterChartSvg(compared)}
+                            </div>
+                        </div>
+                    </details>`
                 : ''}
         </div>
     `;

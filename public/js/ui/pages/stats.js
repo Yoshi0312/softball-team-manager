@@ -8,8 +8,8 @@ import {
     calculatePlayerStats as calcStats,
     calculateTeamSummary,
     getAvailableYears,
-    aggregateGamesByPeriod,
-    aggregateMonthlySummary
+    aggregateMonthlySummary,
+    buildGameTrendData
 } from '../../domain/game-stats.js';
 import { resolveGameType, formatAvg, formatPercent } from '../../domain/game-utils.js';
 
@@ -66,10 +66,10 @@ function renderMonthlyBarChartSvg(monthly) {
         <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto;">
             <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--gray-border)" stroke-width="1" />
             ${monthly.map((m, i) => {
-                const h = (m.count / Math.max(...monthly.map(v => v.count), 1)) * (height - pad * 2);
+                const h = (m.games / Math.max(...monthly.map(v => v.games), 1)) * (height - pad * 2);
                 const x = pad + i * barW + 2;
                 const y = height - pad - h;
-                return `<rect x="${x}" y="${y}" width="${Math.max(barW - 4, 2)}" height="${h}" fill="var(--accent-light)"><title>${m.label}: ${m.count}試合</title></rect>`;
+                return `<rect x="${x}" y="${y}" width="${Math.max(barW - 4, 2)}" height="${h}" fill="var(--accent-light)"><title>${m.label}: ${m.games}試合</title></rect>`;
             }).join('')}
             ${monthly.map((m, i) => i % 2 === 0
                 ? `<text x="${pad + i * barW + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${m.month}</text>`
@@ -117,15 +117,14 @@ export function renderTeamSummary() {
     const container = document.getElementById('team-summary-container');
     const trendsContainer = document.getElementById('team-trends-container');
     const summaries = calculateTeamSummary(state.gameStats, { year: state.selectedYear });
-    const trendByGame = aggregateGamesByPeriod(state.gameStats, {
+    const trendData = buildGameTrendData(state.gameStats, {
         year: state.selectedYear,
-        type: state.selectedGameType,
-        groupBy: 'month'
+        gameType: state.selectedGameType
     });
     const monthly = aggregateMonthlySummary(state.gameStats, {
         year: state.selectedYear,
         type: state.selectedGameType
-    });
+    }).map(m => ({ ...m, games: m.count }));
 
     container.innerHTML = `
         <div class="card" style="padding: 12px;">
@@ -152,8 +151,9 @@ export function renderTeamSummary() {
         </div>
     `;
 
-    const winRateSeries = trendByGame.filter(t => t.count > 0).map(t => ({ label: t.label, value: t.winRate }));
-    const diffSeries = trendByGame.filter(t => t.count > 0).map(t => ({ label: t.label, value: t.diff }));
+    const winRateSeries = trendData.series.monthlyWinRate;
+    const diffSeries = trendData.series.monthlyRunDiff;
+    const cumulativeWinSeries = trendData.series.cumulativeWins;
 
     if (!trendsContainer) return;
 
@@ -168,6 +168,10 @@ export function renderTeamSummary() {
                 <div>
                     <p style="font-size:12px; margin-bottom:6px;">得失点差推移</p>
                     ${renderLineChartSvg(diffSeries, { color: '#19a974', valueFormatter: v => `${v >= 0 ? '+' : ''}${v}` })}
+                </div>
+                <div>
+                    <p style="font-size:12px; margin-bottom:6px;">累積勝利数（試合単位）</p>
+                    ${renderLineChartSvg(cumulativeWinSeries, { min: 0, color: '#ff8a00', valueFormatter: v => `${v}` })}
                 </div>
                 <div>
                     <p style="font-size:12px; margin-bottom:6px;">月別試合数</p>

@@ -24,7 +24,7 @@ function sortEvents(events) {
 async function ensureEventAttendance(eventId) {
     if (!eventId) return [];
     if (!attendanceCache[eventId]) {
-        attendanceCache[eventId] = await DB.getAttendancesByEvent(state.teamId, eventId);
+        attendanceCache[eventId] = await DB.listAttendances(state.teamId, eventId);
     }
     return attendanceCache[eventId];
 }
@@ -84,7 +84,7 @@ function renderMyAttendance(event, attendances) {
 
 function renderAttendanceSummary(attendances) {
     const members = state.teamMembers || [];
-    const activeMembers = members.filter(m => m.role);
+    const activeMembers = members.filter(m => m.role !== 'inactive');
     const answeredIds = new Set(attendances.map(a => a.id));
 
     const counts = {
@@ -95,12 +95,23 @@ function renderAttendanceSummary(attendances) {
 
     const unanswered = activeMembers.filter(m => !answeredIds.has(m.id));
     const summary = document.getElementById('attendance-summary');
+    const statusById = new Map(attendances.map(a => [a.id, a.status]));
+
     summary.innerHTML = `
         <div style="display:grid; grid-template-columns:repeat(4, minmax(70px,1fr)); gap:8px; margin-bottom:12px;">
             <div class="card" style="padding:8px; text-align:center;"><strong>${counts.attend}</strong><br><small>出席</small></div>
             <div class="card" style="padding:8px; text-align:center;"><strong>${counts.absent}</strong><br><small>欠席</small></div>
             <div class="card" style="padding:8px; text-align:center;"><strong>${counts.pending}</strong><br><small>保留</small></div>
             <div class="card" style="padding:8px; text-align:center;"><strong>${unanswered.length}</strong><br><small>未回答</small></div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <h4 style="margin-bottom:6px;">メンバー回答状況</h4>
+            <ul>
+                ${activeMembers.map(m => {
+                    const label = getStatusLabel(statusById.get(m.id));
+                    return `<li>${m.displayName || m.email || m.id}: <strong>${label}</strong></li>`;
+                }).join('')}
+            </ul>
         </div>
         <div>
             <h4 style="margin-bottom:6px;">未回答者一覧</h4>
@@ -139,12 +150,12 @@ export async function selectAttendanceEvent(eventId) {
 export async function saveMyAttendance(status) {
     if (!selectedEventId || !auth.currentUser) return;
 
-    await DB.saveAttendance(state.teamId, selectedEventId, auth.currentUser.uid, {
+    await DB.saveAttendanceResponse(state.teamId, selectedEventId, auth.currentUser.uid, {
         status,
         userName: auth.currentUser.displayName || auth.currentUser.email || ''
     });
 
-    attendanceCache[selectedEventId] = await DB.getAttendancesByEvent(state.teamId, selectedEventId);
+    attendanceCache[selectedEventId] = await DB.listAttendances(state.teamId, selectedEventId);
     await renderAttendancePage();
 }
 
@@ -168,6 +179,11 @@ export function resetAttendanceEventForm() {
 }
 
 export async function saveAttendanceEvent() {
+    if (currentUserRole !== 'admin') {
+        alert('イベント作成は管理者のみ実行できます');
+        return;
+    }
+
     const title = document.getElementById('attendance-title').value.trim();
     const date = document.getElementById('attendance-date').value;
     const note = document.getElementById('attendance-note').value.trim();
@@ -180,10 +196,10 @@ export async function saveAttendanceEvent() {
     if (editingEventId) {
         await DB.updateEvent(state.teamId, editingEventId, { title, date, note });
     } else {
-        selectedEventId = await DB.addEvent(state.teamId, { title, date, note });
+        selectedEventId = await DB.createEvent(state.teamId, { title, date, note });
     }
 
-    state.events = await DB.getEvents(state.teamId);
+    state.events = await DB.listEvents(state.teamId);
     if (editingEventId) {
         delete attendanceCache[editingEventId];
     }

@@ -6,6 +6,12 @@ import * as DB from '../db.js';
 import { showConfirm } from '../ui/modals/confirmModal.js';
 import { alertFirestoreWriteError } from '../ui/alerts.js';
 
+const BACKUP_RECOMMENDATION = '実行前に「データをエクスポート」でバックアップ取得を推奨します。';
+
+function buildDestructiveActionMessage(lines) {
+    return [...lines, BACKUP_RECOMMENDATION].join('\n');
+}
+
 /**
  * loadData は app.js に定義されている。
  * 循環参照を避けるため、importData 内では window.loadData を使う。
@@ -37,7 +43,10 @@ export function importData(event) {
     if (!file) return;
 
     showConfirm(
-        'インポートを実行すると既存データは全て上書きされます。\n実行前に「データをエクスポート」でバックアップ取得を推奨します。\nこのまま続行しますか？',
+        buildDestructiveActionMessage([
+            'インポートを実行すると既存データは全て上書きされます。',
+            'このまま続行しますか？'
+        ]),
         () => runImport(file)
     );
 
@@ -101,7 +110,10 @@ async function runImport(file) {
 
 /** 全データ削除 */
 export function confirmClearData() {
-    showConfirm('全てのデータを削除しますか？\nこの操作は取り消せません。\n実行前に「データをエクスポート」でバックアップ取得を推奨します。', async () => {
+    showConfirm(buildDestructiveActionMessage([
+        '全てのデータを削除しますか？',
+        'この操作は取り消せません。'
+    ]), async () => {
         try {
             await DB.deleteAllData(state.teamId);
             state.players = [];

@@ -6,7 +6,7 @@ import { POSITIONS } from '../../constants.js';
 import * as DB from '../../db.js';
 import { getBattingClass, getBattingLabel } from '../../domain/game-utils.js';
 import { showConfirm } from '../modals/confirmModal.js';
-import { alertFirestoreWriteError } from '../alerts.js';
+import { alertFirestoreWriteError, alertStandardizedWriteError } from '../alerts.js';
 
 /** 選手一覧を描画 */
 export function renderPlayerList() {
@@ -145,7 +145,7 @@ export async function savePlayer() {
         closePlayerModal();
         renderPlayerList();
     } catch (e) {
-        alertFirestoreWriteError('選手保存エラー', e);
+        alertStandardizedWriteError('players', e);
     }
 }
 

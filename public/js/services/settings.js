@@ -11,7 +11,7 @@ import {
     reissueInviteCode,
     buildInviteUrl
 } from '../auth.js';
-import { alertFirestoreWriteError } from '../ui/alerts.js';
+import { alertFirestoreWriteError, alertStandardizedWriteError } from '../ui/alerts.js';
 
 /** 設定フォームを読み込み */
 export function loadSettings() {
@@ -142,7 +142,7 @@ export async function saveSettings() {
         await DB.updateTeamSettings(state.teamId, state.settings);
         alert('設定を保存しました');
     } catch (e) {
-        alertFirestoreWriteError('設定保存エラー', e);
+        alertStandardizedWriteError('settings', e);
     }
 }
 

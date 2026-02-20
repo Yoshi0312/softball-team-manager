@@ -438,17 +438,25 @@
 
             <div id="dashboard-chart-panels">
                 <div class="card" style="padding: 12px;">
-                    <h2 class="card-title" style="margin-bottom: 8px;">戦績推移</h2>
+                    <h2 class="card-title" style="margin-bottom: 8px;">戦績推移（軽量表示）</h2>
                     <div id="dashboard-trend-chart-container"></div>
+                    <details style="margin-top: 10px;">
+                        <summary style="cursor:pointer; font-size:12px; font-weight:600;">詳細グラフを開く</summary>
+                        <div style="margin-top:10px; display:grid; gap:12px;">
+                            <div>
+                                <p class="text-muted" style="font-size:12px; margin-bottom:6px;">得失点差トレンド</p>
+                                <div id="dashboard-run-diff-chart-container"></div>
+                            </div>
+                            <div>
+                                <p class="text-muted" style="font-size:12px; margin-bottom:6px;">月別勝敗内訳</p>
+                                <div id="dashboard-monthly-breakdown-container"></div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
 
                 <div class="card" style="padding: 12px;">
-                    <h2 class="card-title" style="margin-bottom: 8px;">得失点差</h2>
-                    <div id="dashboard-run-diff-chart-container"></div>
-                </div>
-
-                <div class="card" style="padding: 12px;">
-                    <h2 class="card-title" style="margin-bottom: 8px;">月別成績</h2>
+                    <h2 class="card-title" style="margin-bottom: 8px;">月別成績（軽量表示）</h2>
                     <div id="dashboard-monthly-chart-container"></div>
                 </div>
 
@@ -459,6 +467,7 @@
                             <option value="all">全ての対戦相手</option>
                         </select>
                     </div>
+                    <div id="dashboard-opponent-trend-chart-container" style="margin-bottom:10px;"></div>
                     <div id="stats-opponent-analysis-container"></div>
                 </div>
             </div>
@@ -510,8 +519,8 @@
                                 <th>打率</th>
                                 <th>出塁</th>
                                 <th>長打</th>
-                                <th>OPS</th>
-                                <th>wOBA</th>
+                                <th>OPS<span class="metric-tooltip" tabindex="0" data-tooltip="OPS = 出塁率 + 長打率。出塁力と長打力をまとめて評価する指標です。">?</span></th>
+                                <th>wOBA<span class="metric-tooltip" tabindex="0" data-tooltip="wOBA = 打撃結果ごとに重みをつけた出塁率。単打/長打/四球の価値差を反映します。">?</span></th>
                             </tr>
                         </thead>
                         <tbody id="player-stats-body">
@@ -541,8 +550,8 @@
                                 <th>犠打</th>
                                 <th>ISO</th>
                                 <th>BABIP</th>
-                                <th>K%</th>
-                                <th>BB%</th>
+                                <th>K%<span class="metric-tooltip" tabindex="0" data-tooltip="K% = 三振 ÷ 打席。低いほど三振しにくい傾向です。">?</span></th>
+                                <th>BB%<span class="metric-tooltip" tabindex="0" data-tooltip="BB% = 四球 ÷ 打席。高いほど選球眼の良さを示します。">?</span></th>
                             </tr>
                         </thead>
                         <tbody id="player-detail-body">

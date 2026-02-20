@@ -447,6 +447,16 @@
                     <h2 class="card-title" style="margin-bottom: 8px;">月別成績</h2>
                     <div id="dashboard-monthly-chart-container"></div>
                 </div>
+
+                <div class="card" style="padding: 12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                        <h2 class="card-title" style="margin:0;">対戦相手分析</h2>
+                        <select id="stats-opponent-filter" class="form-control" style="width:auto; min-width:180px;" onchange="changeOpponentFilter(this.value)">
+                            <option value="all">全ての対戦相手</option>
+                        </select>
+                    </div>
+                    <div id="stats-opponent-analysis-container"></div>
+                </div>
             </div>
         </div>
 

@@ -190,6 +190,59 @@ export function calculateTeamSummary(games, options = {}) {
 }
 
 /**
+ * 対戦相手ごとの成績を集計
+ *
+ * @param {Array<Object>} games - 試合データ配列
+ * @param {Object} [options]
+ * @param {number} [options.year] - 対象年度
+ * @param {string} [options.type='all'] - 試合種別
+ * @returns {Array<Object>} 対戦相手ごとのサマリ配列
+ *   [{ opponent, count, wins, losses, draws, scored, conceded, diff, winRate, avgScored, avgConceded }]
+ */
+export function calculateOpponentSummary(games, options = {}) {
+    const filtered = filterGames(games, options);
+    const summaryMap = new Map();
+
+    filtered.forEach((game) => {
+        const opponent = String(game.opponent || '不明').trim() || '不明';
+        if (!summaryMap.has(opponent)) {
+            summaryMap.set(opponent, {
+                opponent,
+                count: 0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                scored: 0,
+                conceded: 0,
+                diff: 0,
+                winRate: null,
+                avgScored: 0,
+                avgConceded: 0
+            });
+        }
+
+        const item = summaryMap.get(opponent);
+        const our = game.ourScore || 0;
+        const opp = game.opponentScore || 0;
+
+        item.count += 1;
+        item.scored += our;
+        item.conceded += opp;
+
+        if (our > opp) item.wins += 1;
+        else if (our < opp) item.losses += 1;
+        else item.draws += 1;
+
+        item.diff = item.scored - item.conceded;
+        item.winRate = item.count > 0 ? (item.wins + 0.5 * item.draws) / item.count : null;
+        item.avgScored = item.count > 0 ? item.scored / item.count : 0;
+        item.avgConceded = item.count > 0 ? item.conceded / item.count : 0;
+    });
+
+    return Array.from(summaryMap.values());
+}
+
+/**
  * 利用可能な年度一覧を取得
  * @param {Array<Object>} games - 試合データ配列
  * @returns {Array<number>} 降順ソート済みの年度配列

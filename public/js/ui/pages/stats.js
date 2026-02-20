@@ -2,6 +2,9 @@
 // 成績管理ページ
 // =====================
 import { state } from '../state.js';
+import { auth } from '../../firebase-init.js';
+import { currentUserRole, updateUIForRole } from '../../auth.js';
+import { getMvpVotesByEvent, saveMvpVote, updateVoteSettings } from '../../db.js';
 import { GAME_TYPES, BATTING_RESULTS } from '../../constants.js';
 import {
     filterGames,
@@ -41,12 +44,48 @@ const PLAYER_COMPARE_METRICS = [
     { label: 'AVG', formatter: s => safeFormatAvg(s.avg) }
 ];
 
+
+let selectedVoteEventId = null;
+const mvpVoteCache = {};
+
+function sortVoteEvents(events) {
+    return [...(events || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+}
+
+function formatDateTimeLocal(value) {
+    if (!value) return '';
+    const date = value?.toDate ? value.toDate() : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mi = String(date.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function isVoteOpen(event) {
+    if (!event?.voteEnabled || event?.voteLocked) return false;
+    if (!event.voteDeadline) return true;
+    const deadlineDate = event.voteDeadline?.toDate ? event.voteDeadline.toDate() : new Date(event.voteDeadline);
+    if (Number.isNaN(deadlineDate.getTime())) return true;
+    return deadlineDate >= new Date();
+}
+
+async function loadVotes(eventId, { force = false } = {}) {
+    if (!eventId) return [];
+    if (!force && mvpVoteCache[eventId]) return mvpVoteCache[eventId];
+    mvpVoteCache[eventId] = await getMvpVotesByEvent(state.teamId, eventId);
+    return mvpVoteCache[eventId];
+}
+
 /** 成績ページ全体を描画 */
-export function renderStatsPage() {
+export async function renderStatsPage() {
     updateYearSelector();
     renderTeamSummary();
     renderGameStatsList();
     renderPlayerStats();
+    await renderMvpVotingSection();
 }
 
 function renderLineChartSvg(series, options = {}) {
@@ -112,6 +151,145 @@ export function updateYearSelector() {
     select.innerHTML = years.map(y =>
         `<option value="${y}" ${y === state.selectedYear ? 'selected' : ''}>${y}年</option>`
     ).join('');
+}
+
+
+export async function changeMvpVoteEvent(eventId) {
+    selectedVoteEventId = eventId || null;
+    await renderMvpVotingSection();
+}
+
+export async function submitMvpVote() {
+    const user = auth.currentUser;
+    if (!user || !selectedVoteEventId) return;
+
+    const event = (state.events || []).find(e => e.id === selectedVoteEventId);
+    if (!event || !isVoteOpen(event)) {
+        alert('このイベントの投票受付は終了しています');
+        return;
+    }
+
+    const selectedPlayerId = document.getElementById('mvp-vote-player')?.value;
+    if (!selectedPlayerId) {
+        alert('投票する選手を選択してください');
+        return;
+    }
+
+    const votes = await loadVotes(selectedVoteEventId);
+    if (votes.some(v => v.id === user.uid)) {
+        alert('すでに投票済みです（1ユーザー1票）');
+        return;
+    }
+
+    const player = state.players.find(p => p.id === selectedPlayerId);
+    await saveMvpVote(state.teamId, selectedVoteEventId, user.uid, {
+        playerId: selectedPlayerId,
+        playerName: player?.name || '不明な選手',
+        voterName: user.displayName || user.email || ''
+    });
+
+    await loadVotes(selectedVoteEventId, { force: true });
+    await renderMvpVotingSection();
+    alert('MVP投票を送信しました');
+}
+
+export async function saveMvpVoteSettings() {
+    if (currentUserRole !== 'admin' || !selectedVoteEventId) {
+        alert('投票設定を更新できるのは管理者のみです');
+        return;
+    }
+
+    const enabled = document.getElementById('mvp-vote-enabled')?.checked;
+    const locked = document.getElementById('mvp-vote-locked')?.checked;
+    const deadlineValue = document.getElementById('mvp-vote-deadline')?.value;
+
+    await updateVoteSettings(state.teamId, selectedVoteEventId, {
+        voteEnabled: !!enabled,
+        voteLocked: !!locked,
+        voteDeadline: deadlineValue ? new Date(deadlineValue).toISOString() : null
+    });
+
+    const event = state.events.find(e => e.id === selectedVoteEventId);
+    if (event) {
+        event.voteEnabled = !!enabled;
+        event.voteLocked = !!locked;
+        event.voteDeadline = deadlineValue ? new Date(deadlineValue).toISOString() : null;
+    }
+    await renderMvpVotingSection();
+    alert('投票設定を更新しました');
+}
+
+export async function renderMvpVotingSection() {
+    const events = sortVoteEvents(state.events || []);
+    if (!selectedVoteEventId && events.length > 0) {
+        selectedVoteEventId = events[0].id;
+    }
+
+    const event = events.find(e => e.id === selectedVoteEventId) || null;
+    const votes = event ? await loadVotes(event.id) : [];
+    const user = auth.currentUser;
+    const myVote = votes.find(v => v.id === user?.uid);
+
+    const rankingMap = new Map();
+    votes.forEach((vote) => {
+        if (!vote.playerId) return;
+        const current = rankingMap.get(vote.playerId) || {
+            playerId: vote.playerId,
+            playerName: vote.playerName || (state.players.find(p => p.id === vote.playerId)?.name) || '不明な選手',
+            count: 0
+        };
+        current.count += 1;
+        rankingMap.set(vote.playerId, current);
+    });
+
+    const ranking = [...rankingMap.values()].sort((a, b) => b.count - a.count || a.playerName.localeCompare(b.playerName));
+    const statusText = event
+        ? (isVoteOpen(event) ? '受付中' : '締切')
+        : 'イベント未選択';
+
+    const wrapper = document.getElementById('stats-mvp-vote-container');
+    if (!wrapper) return;
+
+    wrapper.innerHTML = `
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:8px;">MVP投票</h2>
+            <div style="display:grid; gap:8px;">
+                <label class="form-label">対象イベント</label>
+                <select class="form-control" onchange="changeMvpVoteEvent(this.value)">
+                    ${events.length ? events.map(e => `<option value="${e.id}" ${e.id === selectedVoteEventId ? 'selected' : ''}>${e.date || ''} ${e.title || '名称未設定'}</option>`).join('') : '<option value="">イベントがありません</option>'}
+                </select>
+                <p class="text-muted" style="font-size:12px; margin:0;">現在の状態: <strong>${statusText}</strong>${event?.voteDeadline ? ` / 締切: ${new Date(event.voteDeadline).toLocaleString('ja-JP')}` : ''}</p>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <select id="mvp-vote-player" class="form-control" style="flex:1; min-width:180px;" ${!event || !isVoteOpen(event) || myVote ? 'disabled' : ''}>
+                        <option value="">投票する選手を選択</option>
+                        ${state.players.filter(p => p.status === 'active').map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                    </select>
+                    <button class="btn btn-primary" onclick="submitMvpVote()" ${!event || !isVoteOpen(event) || myVote ? 'disabled' : ''}>投票する</button>
+                </div>
+                ${myVote ? `<p style="font-size:12px; margin:0;">あなたは <strong>${myVote.playerName || '不明な選手'}</strong> に投票済みです（1ユーザー1票）。</p>` : ''}
+            </div>
+        </div>
+
+        <div class="card" data-role="admin">
+            <h3 class="card-title" style="margin-bottom:8px;">投票受付設定（管理者）</h3>
+            <div style="display:grid; gap:8px;">
+                <label class="form-label"><input type="checkbox" id="mvp-vote-enabled" ${event?.voteEnabled ? 'checked' : ''}> 投票受付を有効化</label>
+                <label class="form-label"><input type="checkbox" id="mvp-vote-locked" ${event?.voteLocked ? 'checked' : ''}> 手動で締め切る（即時停止）</label>
+                <label class="form-label">締切日時</label>
+                <input type="datetime-local" id="mvp-vote-deadline" class="form-control" value="${formatDateTimeLocal(event?.voteDeadline)}">
+                <button class="btn btn-secondary" onclick="saveMvpVoteSettings()" ${!event ? 'disabled' : ''}>設定を保存</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 class="card-title" style="margin-bottom:8px;">得票数ランキング</h3>
+            ${ranking.length
+                ? `<ol style="padding-left:20px; margin:0;">${ranking.map(r => `<li>${r.playerName} <strong>${r.count}票</strong></li>`).join('')}</ol>`
+                : '<p class="text-muted">まだ投票がありません</p>'}
+        </div>
+    `;
+
+    updateUIForRole(currentUserRole);
 }
 
 /** 年度変更 */

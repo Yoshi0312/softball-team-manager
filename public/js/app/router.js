@@ -12,7 +12,7 @@ export function showPage(pageId) {
 
     document.getElementById(`page-${pageId}`).classList.add('active');
 
-    const navIndex = { home: 0, players: 1, lineup: 2, attendance: 3, stats: 4, saved: 5, preview: 5, settings: -1 };
+    const navIndex = { home: 0, players: 1, lineup: 2, attendance: 3, accounting: 4, stats: 5, saved: 6, preview: 6, settings: -1 };
     if (navIndex[pageId] >= 0) {
         document.querySelectorAll('.nav-item')[navIndex[pageId]].classList.add('active');
     }
@@ -23,6 +23,7 @@ export function showPage(pageId) {
         lineup: 'メンバー表作成',
         preview: 'プレビュー',
         attendance: '出欠管理',
+        accounting: '会計管理',
         stats: '成績管理',
         saved: '保存済み',
         settings: '設定'

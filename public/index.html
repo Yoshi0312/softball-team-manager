@@ -55,6 +55,12 @@
                     </svg>
                     出欠管理ページを開く
                 </button>
+                <button class="btn btn-secondary btn-block" onclick="showPage('accounting')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1v22M1 12h22"/>
+                    </svg>
+                    会計ページを開く
+                </button>
             </div>
         </div>
 
@@ -355,6 +361,34 @@
             <div id="attendance-summary"></div>
         </div>
     </div>
+
+    <!-- Accounting Page -->
+    <div id="page-accounting" class="page">
+        <div class="card" data-role="admin">
+            <h2 class="card-title">収入 / 支出を登録</h2>
+            <div style="display:grid; gap:8px;">
+                <select id="accounting-type" class="form-control">
+                    <option value="income">収入</option>
+                    <option value="expense">支出</option>
+                </select>
+                <input id="accounting-amount" class="form-control" type="number" min="1" placeholder="金額">
+                <input id="accounting-category" class="form-control" placeholder="カテゴリ（例: 会費 / 用具費）">
+                <input id="accounting-date" class="form-control" type="date">
+                <input id="accounting-memo" class="form-control" placeholder="メモ（任意）">
+                <button class="btn btn-primary" onclick="saveAccountingEntry()">登録</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                <h2 class="card-title" style="margin:0;">月次一覧</h2>
+                <input id="accounting-month" class="form-control" type="month" style="width:auto;" onchange="changeAccountingMonth()">
+            </div>
+            <div id="accounting-summary"></div>
+            <div id="accounting-list" style="margin-top:10px;"></div>
+        </div>
+    </div>
+
 
     <!-- Stats Page -->
     <div id="page-stats" class="page">
@@ -852,6 +886,13 @@
                 <line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
             出欠
+        </a>
+        <a class="nav-item" onclick="showPage('accounting')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 3v18"/>
+                <path d="M17 7c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.8 3 4 3 4 1.3 4 3-1.8 3-4 3-4-1.3-4-3"/>
+            </svg>
+            会計
         </a>
         <a class="nav-item" onclick="showPage('stats')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

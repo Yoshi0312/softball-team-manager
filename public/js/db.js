@@ -177,6 +177,42 @@ export async function getTeamMembers(teamId) {
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+// =====================
+// 会計管理 (accounting)
+// =====================
+
+// 会計データ一覧を取得
+export async function getAccountingEntries(teamId) {
+    const ref = collection(db, 'teams', teamId, 'accounting');
+    const snapshot = await getDocs(ref);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// 会計データを追加（収入/支出）
+export async function addAccountingEntry(teamId, entryData) {
+    const ref = collection(db, 'teams', teamId, 'accounting');
+    const docRef = await addDoc(ref, {
+        ...entryData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+    });
+    return docRef.id;
+}
+
+// 月次会計データを取得（YYYY-MM）
+export async function getMonthlyAccountingEntries(teamId, month) {
+    const ref = collection(db, 'teams', teamId, 'accounting');
+    const q = query(ref, where('month', '==', month));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// 会計データを削除
+export async function deleteAccountingEntry(teamId, entryId) {
+    const ref = doc(db, 'teams', teamId, 'accounting', entryId);
+    await deleteDoc(ref);
+}
+
 // 試合成績を追加
 export async function addGameStat(teamId, statData) {
     const ref = collection(db, 'teams', teamId, 'gameStats');
@@ -322,16 +358,17 @@ export async function checkConflict(teamId, collectionName, docId, clientMeta = 
 // 全データ一括読み込み（init用）
 // =====================
 export async function loadAllData(teamId) {
-    const [players, lineups, templates, gameStats, settings, events, teamMembers] = await Promise.all([
+    const [players, lineups, templates, gameStats, settings, events, teamMembers, accountingEntries] = await Promise.all([
         getPlayers(teamId),
         getLineups(teamId),
         getTemplates(teamId),
         getGameStats(teamId),
         getTeamSettings(teamId),
         getEvents(teamId),
-        getTeamMembers(teamId)
+        getTeamMembers(teamId),
+        getAccountingEntries(teamId)
     ]);
-    return { players, lineups, templates, gameStats, settings, events, teamMembers };
+    return { players, lineups, templates, gameStats, settings, events, teamMembers, accountingEntries };
 }
 
 // =====================
@@ -339,7 +376,7 @@ export async function loadAllData(teamId) {
 // =====================
 export async function deleteAllData(teamId) {
     // players, lineups, gameStats の全ドキュメントを削除
-    const collections = ['players', 'lineups', 'gameStats'];
+    const collections = ['players', 'lineups', 'gameStats', 'accounting'];
 
     for (const col of collections) {
         const ref = collection(db, 'teams', teamId, col);

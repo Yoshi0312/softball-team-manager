@@ -7,7 +7,7 @@ import { BATTING_RESULTS, GAME_TYPES } from '../../constants.js';
 import * as DB from '../../db.js';
 import { generateId, resolveGameType } from '../../domain/game-utils.js';
 import { showConfirm } from './confirmModal.js';
-import { alertFirestoreWriteError } from '../alerts.js';
+import { alertFirestoreWriteError, alertStandardizedWriteError } from '../alerts.js';
 // 保存後の画面更新用（循環しない一方向import）
 import { renderStatsPage } from '../pages/stats.js';
 import { renderSavedList } from '../pages/saved.js';
@@ -549,7 +549,7 @@ export async function saveGameStat() {
         renderStatsPage();
         renderSavedList();
     } catch (e) {
-        alertFirestoreWriteError('試合成績保存エラー', e);
+        alertStandardizedWriteError('gameStats', e);
     }
 }
 

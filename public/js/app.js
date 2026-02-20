@@ -37,7 +37,8 @@ import {
     renderReserves, updateReserve, addReserveSlot,
     saveLineup, saveAsTemplate, loadLineup, deleteLineup,
     previewLineup, renderPreview, renderFieldDiagram,
-    switchPreviewTab, downloadAsImage
+    switchPreviewTab, downloadAsImage,
+    suggestLineupRecommendation, applyLineupRecommendation, discardLineupRecommendation
 } from './ui/pages/lineup.js';
 import { renderSavedList, renderSavedLineups, renderSavedTemplates, switchSavedTab } from './ui/pages/saved.js';
 import { renderAccountingPage, changeAccountingMonth, saveAccountingEntry, deleteAccounting } from './ui/pages/accounting.js';
@@ -143,6 +144,7 @@ export {
     saveLineup, saveAsTemplate, loadLineup, deleteLineup,
     previewLineup, renderPreview, renderFieldDiagram,
     switchPreviewTab, downloadAsImage,
+    suggestLineupRecommendation, applyLineupRecommendation, discardLineupRecommendation,
     // saved
     renderSavedList, renderSavedLineups, renderSavedTemplates, switchSavedTab,
     // accounting

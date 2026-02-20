@@ -419,6 +419,37 @@ select.form-control {
     background: var(--switch-batter);
 }
 
+
+.lineup-recommendation-preview {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fafcff;
+}
+
+.lineup-rec-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.lineup-rec-table td {
+    font-size: 12px;
+}
+
+.lineup-rec-changed {
+    background: #e8f0fe;
+}
+
+.lineup-rec-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
 /* Stats Table */
 .stats-table {
     width: 100%;

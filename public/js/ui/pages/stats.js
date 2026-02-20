@@ -56,23 +56,24 @@ function renderLineChartSvg(series, options = {}) {
     `;
 }
 
-function renderMonthlyBarChartSvg(monthly) {
+function renderMonthlyBarChartSvg(series) {
     const width = 560;
     const height = 180;
     const pad = 24;
-    const barW = (width - pad * 2) / monthly.length;
+    const barW = (width - pad * 2) / series.length;
+    const maxValue = Math.max(...series.map(v => v.value), 1);
 
     return `
         <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto;">
             <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="var(--gray-border)" stroke-width="1" />
-            ${monthly.map((m, i) => {
-                const h = (m.games / Math.max(...monthly.map(v => v.games), 1)) * (height - pad * 2);
+            ${series.map((point, i) => {
+                const h = (point.value / maxValue) * (height - pad * 2);
                 const x = pad + i * barW + 2;
                 const y = height - pad - h;
-                return `<rect x="${x}" y="${y}" width="${Math.max(barW - 4, 2)}" height="${h}" fill="var(--accent-light)"><title>${m.label}: ${m.games}試合</title></rect>`;
+                return `<rect x="${x}" y="${y}" width="${Math.max(barW - 4, 2)}" height="${h}" fill="var(--accent-light)"><title>${point.label}: ${point.value}試合</title></rect>`;
             }).join('')}
-            ${monthly.map((m, i) => i % 2 === 0
-                ? `<text x="${pad + i * barW + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${m.month}</text>`
+            ${series.map((point, i) => i % 2 === 0
+                ? `<text x="${pad + i * barW + barW / 2}" y="${height - 8}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${point.label}</text>`
                 : '').join('')}
         </svg>
     `;
@@ -131,7 +132,7 @@ export function renderTeamSummary() {
     const monthly = aggregateMonthlySummary(state.gameStats, {
         year: state.selectedYear,
         type: state.selectedGameType
-    }).map(m => ({ ...m, games: m.count }));
+    });
 
     container.innerHTML = `
         <div class="card" style="padding: 12px;">
@@ -161,8 +162,8 @@ export function renderTeamSummary() {
     const winRateSeries = trendData.series.monthlyWinRate;
     const diffSeries = trendData.series.monthlyRunDiff;
     const monthlySeries = monthly
-        .filter(m => m.games > 0)
-        .map(m => ({ label: m.month, value: m.games }));
+        .filter(m => m.count > 0)
+        .map(m => ({ label: m.label, value: m.count }));
     const filteredGames = filterGames(state.gameStats, {
         year: state.selectedYear,
         type: state.selectedGameType

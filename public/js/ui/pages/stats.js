@@ -106,13 +106,15 @@ export function changeStatsGameType(gameType) {
 
 /** タブ切替 */
 export function switchStatsTab(tab) {
+    const targetTab = ['games', 'players', 'dashboard'].includes(tab) ? tab : 'games';
+
     document.querySelectorAll('#page-stats [data-stats-tab]').forEach(t => {
-        t.classList.toggle('active', t.dataset.statsTab === tab);
+        t.classList.toggle('active', t.dataset.statsTab === targetTab);
     });
 
-    document.getElementById('stats-games').style.display = tab === 'games' ? 'block' : 'none';
-    document.getElementById('stats-players').style.display = tab === 'players' ? 'block' : 'none';
-    document.getElementById('stats-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
+    document.getElementById('stats-games').style.display = targetTab === 'games' ? 'block' : 'none';
+    document.getElementById('stats-players').style.display = targetTab === 'players' ? 'block' : 'none';
+    document.getElementById('stats-dashboard').style.display = targetTab === 'dashboard' ? 'block' : 'none';
 }
 
 /** チームサマリを描画 */
@@ -121,6 +123,7 @@ export function renderTeamSummary() {
     const trendContainer = document.getElementById('dashboard-trend-chart-container');
     const runDiffContainer = document.getElementById('dashboard-run-diff-chart-container');
     const monthlyContainer = document.getElementById('dashboard-monthly-chart-container');
+    const chartPanels = document.getElementById('dashboard-chart-panels');
     const emptyContainer = document.getElementById('dashboard-empty');
     const emptyTitle = document.getElementById('dashboard-empty-title');
     const emptyDescription = document.getElementById('dashboard-empty-description');
@@ -171,21 +174,27 @@ export function renderTeamSummary() {
 
     if (!trendContainer || !runDiffContainer || !monthlyContainer) return;
 
+    const selectedTypeLabel = state.selectedGameType === 'all'
+        ? '全ての種別'
+        : ((GAME_TYPES[state.selectedGameType] || {}).label || '選択種別');
+
     if (filteredGames.length === 0) {
         if (emptyContainer) emptyContainer.style.display = 'block';
+        if (chartPanels) chartPanels.style.display = 'none';
         if (emptyTitle) {
-            emptyTitle.textContent = `${state.selectedYear}年・${state.selectedGameType === 'all' ? '全種別' : '選択種別'}の成績データがありません`;
+            emptyTitle.textContent = '表示できる成績データがありません';
         }
         if (emptyDescription) {
-            emptyDescription.textContent = '年度・種別を変更するか、試合成績を入力してください。';
+            emptyDescription.textContent = `${state.selectedYear}年 / ${selectedTypeLabel} の条件では試合成績が0件です。年度・種別を変更するか、試合成績を入力してください。`;
         }
-        trendContainer.innerHTML = '<p class="text-muted" style="font-size:12px;">戦績推移を表示するデータがありません。</p>';
-        runDiffContainer.innerHTML = '<p class="text-muted" style="font-size:12px;">得失点差を表示するデータがありません。</p>';
-        monthlyContainer.innerHTML = '<p class="text-muted" style="font-size:12px;">月別成績を表示するデータがありません。</p>';
+        trendContainer.innerHTML = '';
+        runDiffContainer.innerHTML = '';
+        monthlyContainer.innerHTML = '';
         return;
     }
 
     if (emptyContainer) emptyContainer.style.display = 'none';
+    if (chartPanels) chartPanels.style.display = 'block';
 
     trendContainer.innerHTML = renderLineChartSvg(winRateSeries, {
         min: 0,

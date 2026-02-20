@@ -365,7 +365,86 @@ export function switchPreviewTab(tab) {
     document.getElementById('preview-field').style.display = tab === 'field' ? 'block' : 'none';
 }
 
-/** 画像ダウンロード（未実装） */
-export function downloadAsImage() {
-    alert('画像保存機能は次のバージョンで実装予定です。\nスクリーンショットをお使いください。');
+function sanitizeForFilename(value, fallback = 'unknown') {
+    const cleaned = (value || '')
+        .toString()
+        .trim()
+        .replace(/[\\/:*?"<>|\s]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    return cleaned || fallback;
+}
+
+/** プレビュー内で現在表示中のカードを取得 */
+function getActivePreviewTarget() {
+    const table = document.getElementById('preview-table');
+    const field = document.getElementById('preview-field');
+
+    if (!table || !field) return null;
+    return window.getComputedStyle(field).display !== 'none' ? field : table;
+}
+
+/** 画像ダウンロード */
+export async function downloadAsImage() {
+    const target = getActivePreviewTarget();
+    if (!target) {
+        alert('保存対象のプレビューが見つかりませんでした。');
+        return;
+    }
+
+    if (!window.html2canvas) {
+        alert('画像化ライブラリの読み込みに失敗しました。通信状況をご確認のうえ再度お試しください。');
+        return;
+    }
+
+    const lineup = state.currentLineup || {};
+    const date = sanitizeForFilename(lineup.date, new Date().toISOString().slice(0, 10));
+    const opponent = sanitizeForFilename(lineup.opponent, 'unknown');
+    const targetName = target.id === 'preview-field' ? 'field' : 'table';
+    const fileName = `lineup_${date}_vs-${opponent}_${targetName}.png`;
+
+    try {
+        const canvas = await window.html2canvas(target, {
+            backgroundColor: '#ffffff',
+            scale: Math.min(3, window.devicePixelRatio || 1.5),
+            useCORS: true
+        });
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Blobの生成に失敗しました');
+
+        const imageFile = new File([blob], fileName, { type: 'image/png' });
+        const canUseShare = !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [imageFile] });
+
+        if (canUseShare) {
+            await navigator.share({
+                files: [imageFile],
+                title: 'メンバー表画像',
+                text: `${lineup.date || ''} vs ${lineup.opponent || '未定'} のメンバー表`
+            });
+            return;
+        }
+
+        const imageUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            const popup = window.open(imageUrl, '_blank', 'noopener,noreferrer');
+            if (popup) {
+                alert('画像を新しいタブで開きました。長押しで「写真に保存」を選択してください。');
+            }
+        }
+
+        setTimeout(() => URL.revokeObjectURL(imageUrl), 10000);
+    } catch (error) {
+        if (error?.name === 'AbortError') return;
+        console.error('画像保存エラー:', error);
+        alert('画像の保存に失敗しました。もう一度お試しください。');
+    }
 }

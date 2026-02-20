@@ -99,8 +99,9 @@ export function renderSavedTemplates() {
 
 /** 保存済みタブ切替 */
 export function switchSavedTab(tab) {
-    document.querySelectorAll('#page-saved .tab').forEach(t => t.classList.remove('active'));
-    event.target.classList.add('active');
+    document.querySelectorAll('#page-saved [data-saved-tab]').forEach(t => {
+        t.classList.toggle('active', t.dataset.savedTab === tab);
+    });
 
     document.getElementById('saved-lineups').style.display = tab === 'lineups' ? 'block' : 'none';
     document.getElementById('saved-templates').style.display = tab === 'templates' ? 'block' : 'none';

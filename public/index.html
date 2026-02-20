@@ -205,8 +205,8 @@
     <!-- Preview Page -->
     <div id="page-preview" class="page">
         <div class="tabs">
-            <div class="tab active" onclick="switchPreviewTab('table')">メンバー表</div>
-            <div class="tab" onclick="switchPreviewTab('field')">守備位置図</div>
+            <div class="tab active" data-preview-tab="table" onclick="switchPreviewTab('table')">メンバー表</div>
+            <div class="tab" data-preview-tab="field" onclick="switchPreviewTab('field')">守備位置図</div>
         </div>
 
         <div id="preview-table" class="card">
@@ -292,8 +292,8 @@
     <!-- Saved Lineups Page -->
     <div id="page-saved" class="page">
         <div class="tabs">
-            <div class="tab active" onclick="switchSavedTab('lineups')">メンバー表</div>
-            <div class="tab" onclick="switchSavedTab('templates')">テンプレート</div>
+            <div class="tab active" data-saved-tab="lineups" onclick="switchSavedTab('lineups')">メンバー表</div>
+            <div class="tab" data-saved-tab="templates" onclick="switchSavedTab('templates')">テンプレート</div>
         </div>
 
         <div id="saved-lineups" class="card">

@@ -257,6 +257,25 @@
             font-size: 14px;
             color: var(--gray, #888);
         }
+
+        .invite-entry-note {
+            font-size: 12px;
+            color: var(--gray, #888);
+            margin-top: 8px;
+        }
+
+        .invite-deeplink-banner {
+            display: none;
+            background: #e8f0fe;
+            color: #174ea6;
+            border: 1px solid #d2e3fc;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        .invite-deeplink-banner.show { display: block; }
+
     </style>
 </head>
 <body>
@@ -297,6 +316,7 @@
                 <h2>ようこそ！</h2>
                 <p>チームを作成するか、招待コードで参加してください</p>
             </div>
+            <div id="invite-deeplink-banner-first" class="invite-deeplink-banner"></div>
             <div class="choice-cards">
                 <div class="choice-card">
                     <h3>チームを作成する</h3>
@@ -310,6 +330,7 @@
                     <input type="text" id="invite-code-first" class="form-input" placeholder="6桁の招待コード" maxlength="6">
                     <div id="join-team-error-first" class="error-message"></div>
                     <button class="action-btn primary" onclick="handleJoinTeam('first')">参加する</button>
+                    <p class="invite-entry-note">招待URLからアクセスすると、コードは自動入力されます。</p>
                 </div>
             </div>
             <button class="action-btn secondary" style="margin-top: 20px;" onclick="handleLogout()">別のアカウントでログイン</button>
@@ -325,6 +346,8 @@
                 </div>
                 <button class="logout-btn" onclick="handleLogout()">ログアウト</button>
             </div>
+
+            <div id="invite-deeplink-banner-select" class="invite-deeplink-banner"></div>
 
             <p class="section-title">チームを選択</p>
             <div id="team-list">
@@ -345,6 +368,7 @@
                 <input type="text" id="invite-code-select" class="form-input" placeholder="6桁の招待コード" maxlength="6">
                 <div id="join-team-error-select" class="error-message"></div>
                 <button class="action-btn primary" onclick="handleJoinTeam('select')">参加する</button>
+                <p class="invite-entry-note">手入力参加も引き続き利用できます。</p>
             </div>
         </div>
 
@@ -380,6 +404,27 @@
         function clearError(elementId) {
             const el = document.getElementById(elementId);
             if (el) el.classList.remove('show');
+        }
+
+        function getInviteCodeFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return (params.get('invite') || '').trim();
+        }
+
+        function syncInviteInputFields(inviteCode) {
+            if (!inviteCode) return;
+            const first = document.getElementById('invite-code-first');
+            const select = document.getElementById('invite-code-select');
+            if (first) first.value = inviteCode;
+            if (select) select.value = inviteCode;
+        }
+
+        function showInviteDeeplinkMessage(inviteCode, step) {
+            const id = step === 'first' ? 'invite-deeplink-banner-first' : 'invite-deeplink-banner-select';
+            const el = document.getElementById(id);
+            if (!el || !inviteCode) return;
+            el.textContent = `招待リンクを検出しました（コード: ${inviteCode}）。そのまま「参加する」を押すとチーム参加できます。`;
+            el.classList.add('show');
         }
 
         // =====================
@@ -472,14 +517,14 @@
         }
 
         // 招待コードで参加
-        async function handleJoinTeam(source) {
+        async function handleJoinTeam(source, autoJoin = false) {
             const inputId = source === 'first' ? 'invite-code-first' : 'invite-code-select';
             const errorId = source === 'first' ? 'join-team-error-first' : 'join-team-error-select';
             clearError(errorId);
 
             const code = document.getElementById(inputId).value.trim();
             if (!code) {
-                showError(errorId, '招待コードを入力してください');
+                showError(errorId, autoJoin ? '招待リンクが不正です。URLを確認してください' : '招待コードを入力してください');
                 return;
             }
             const user = getCurrentUser();
@@ -517,8 +562,15 @@
             // 所属チーム一覧を取得
             const teams = await getUserTeams(user.uid);
 
+            const inviteCode = getInviteCodeFromUrl();
+            syncInviteInputFields(inviteCode);
+
             if (teams.length === 0) {
                 showStep('step-first-login');
+                if (inviteCode) {
+                    showInviteDeeplinkMessage(inviteCode, 'first');
+                    await handleJoinTeam('first', true);
+                }
                 return;
             }
 
@@ -533,6 +585,10 @@
             renderUserHeader(user);
             renderTeamList(teams);
             showStep('step-team-select');
+            if (inviteCode) {
+                showInviteDeeplinkMessage(inviteCode, 'select');
+                await handleJoinTeam('select', true);
+            }
         });
 
         // inline onclick用にグローバル公開

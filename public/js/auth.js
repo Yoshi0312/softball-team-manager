@@ -13,8 +13,9 @@ import {
   getRedirectResult
 } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
 import {
-  doc, getDoc, setDoc, deleteDoc,
-  collection, serverTimestamp, writeBatch
+  doc, getDoc, setDoc,
+  collection, serverTimestamp, writeBatch,
+  getDocs, query, where, updateDoc
 } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js';
 
 // =====================
@@ -181,8 +182,10 @@ export async function createTeam(teamName, user) {
 // 招待コードでチームに参加
 export async function joinTeamByInviteCode(inviteCode, user) {
   try {
+    const normalizedCode = inviteCode.trim();
+
     // 招待ドキュメントを取得
-    const inviteRef = doc(db, 'invites', inviteCode);
+    const inviteRef = doc(db, 'invites', normalizedCode);
     const inviteDoc = await getDoc(inviteRef);
 
     if (!inviteDoc.exists()) {
@@ -190,6 +193,18 @@ export async function joinTeamByInviteCode(inviteCode, user) {
     }
 
     const inviteData = inviteDoc.data();
+
+    if (!inviteData.teamId) {
+      return { success: false, error: 'invalid_code', message: '無効な招待コードです' };
+    }
+
+    if (inviteData.status === 'revoked') {
+      return { success: false, error: 'revoked', message: 'この招待リンクは無効化されています' };
+    }
+
+    if (inviteData.status === 'used' || inviteData.usedBy || inviteData.usedAt) {
+      return { success: false, error: 'already_used', message: 'この招待リンクはすでに使用されています' };
+    }
 
     // 有効期限チェック
     if (inviteData.expiresAt && inviteData.expiresAt.toDate() < new Date()) {
@@ -227,8 +242,13 @@ export async function joinTeamByInviteCode(inviteCode, user) {
       }
     }, { merge: true });
 
-    // 招待ドキュメントを削除
-    batch.delete(inviteRef);
+    // 招待の利用状態を更新
+    batch.update(inviteRef, {
+      status: 'used',
+      usedBy: user.uid,
+      usedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
 
     await batch.commit();
     console.log('チーム参加完了:', teamId);
@@ -250,7 +270,10 @@ export async function createInviteCode(teamId) {
       teamId: teamId,
       createdBy: auth.currentUser.uid,
       createdAt: serverTimestamp(),
-      expiresAt: expiresAt
+      expiresAt: expiresAt,
+      usedBy: null,
+      usedAt: null,
+      status: 'active'
     });
 
     console.log('招待コード生成:', code);
@@ -260,6 +283,40 @@ export async function createInviteCode(teamId) {
     alert('招待コードの生成に失敗しました');
     throw e;
   }
+}
+
+// チームに紐づく招待一覧を取得（管理者向け）
+export async function getTeamInvites(teamId) {
+  const invitesRef = collection(db, 'invites');
+  const q = query(invitesRef, where('teamId', '==', teamId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map(d => ({ code: d.id, ...d.data() }))
+    .sort((a, b) => {
+      const aTs = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+      const bTs = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+      return bTs - aTs;
+    });
+}
+
+// 招待コードを無効化
+export async function revokeInviteCode(inviteCode) {
+  const inviteRef = doc(db, 'invites', inviteCode);
+  await updateDoc(inviteRef, {
+    status: 'revoked',
+    updatedAt: serverTimestamp()
+  });
+}
+
+// 招待コードを再発行（旧コードを無効化して新規コードを作成）
+export async function reissueInviteCode(inviteCode, teamId) {
+  await revokeInviteCode(inviteCode);
+  return createInviteCode(teamId);
+}
+
+// 招待URLを生成
+export function buildInviteUrl(inviteCode) {
+  return `${window.location.origin}/login.html?invite=${encodeURIComponent(inviteCode)}`;
 }
 
 // =====================

@@ -13,7 +13,9 @@ import {
     filterGames,
     calculatePlayerStats,
     calculateTeamSummary,
-    getAvailableYears
+    getAvailableYears,
+    aggregateGamesByPeriod,
+    aggregateMonthlySummary
 } from './domain/game-stats.js';
 
 // state管理
@@ -40,7 +42,7 @@ import {
 import { renderSavedList, renderSavedLineups, renderSavedTemplates, switchSavedTab } from './ui/pages/saved.js';
 import {
     renderStatsPage, updateYearSelector, changeStatsYear, changeStatsGameType,
-    switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy
+    switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy, togglePlayerCompare
 } from './ui/pages/stats.js';
 
 // modals
@@ -140,7 +142,7 @@ export {
     renderSavedList, renderSavedLineups, renderSavedTemplates, switchSavedTab,
     // stats
     renderStatsPage, updateYearSelector, changeStatsYear, changeStatsGameType,
-    switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy,
+    switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy, togglePlayerCompare,
     // gameStatModal
     openLineupSelectModal, closeLineupSelectModal,
     openGameStatFromLineup, openGameStatModal,
@@ -162,5 +164,6 @@ export {
     state,
     getGameType, resolveGameType, formatAvg, formatPercent,
     getBattingClass, getBattingLabel, getPositionFit, generateId,
-    filterGames, getAvailableYears, calculateTeamSummary, calculatePlayerStats
+    filterGames, getAvailableYears, calculateTeamSummary, calculatePlayerStats,
+    aggregateGamesByPeriod, aggregateMonthlySummary
 };

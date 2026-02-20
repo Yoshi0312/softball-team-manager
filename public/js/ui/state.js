@@ -21,7 +21,8 @@ export const state = {
     currentGameStat: null,
     selectedYear: new Date().getFullYear(),
     selectedGameType: 'all',
-    statsSortBy: 'woba'
+    statsSortBy: 'woba',
+    comparePlayerIds: []
 };
 
 // 確認ダイアログのコールバック（ESMのexport letはimport側から再代入不可のためsetter関数を提供）

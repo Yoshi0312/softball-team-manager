@@ -57,7 +57,10 @@ import { showPlayerStatDetail, closePlayerStatModal } from './ui/modals/playerSt
 import { showConfirm, closeConfirmModal, confirmAction } from './ui/modals/confirmModal.js';
 
 // services
-import { loadSettings, saveSettings, saveData } from './services/settings.js';
+import {
+    loadSettings, saveSettings, saveData,
+    loadInviteManagement, createInviteLinkFromAdmin, copyInviteLink, reissueInviteFromAdmin, invalidateInviteFromAdmin
+} from './services/settings.js';
 import { exportData, importData, confirmClearData } from './services/exports.js';
 
 // =====================
@@ -154,6 +157,7 @@ export {
     exportData, importData, confirmClearData,
     // settings
     loadSettings, saveSettings, saveData,
+    loadInviteManagement, createInviteLinkFromAdmin, copyInviteLink, reissueInviteFromAdmin, invalidateInviteFromAdmin,
     // domain再export
     state,
     getGameType, resolveGameType, formatAvg, formatPercent,

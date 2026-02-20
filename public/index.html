@@ -619,6 +619,35 @@
             <button class="btn btn-primary btn-block" onclick="saveSettings()">設定を保存</button>
         </div>
 
+
+        <div class="card" id="invite-admin-card" data-role="admin">
+            <h2 class="card-title">招待リンク管理</h2>
+            <p class="text-muted" style="font-size: 12px; margin-bottom: 12px;">URL共有を主導線にしつつ、手入力コード参加も継続利用できます。</p>
+            <button class="btn btn-primary btn-block" onclick="createInviteLinkFromAdmin()">招待リンクを発行</button>
+            <div class="form-group" style="margin-top: 12px;">
+                <label class="form-label">最新の招待URL</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="invite-latest-url" class="form-control" placeholder="発行するとURLが表示されます" readonly>
+                    <button class="btn btn-secondary" style="flex:0 0 auto;" onclick="copyInviteFromLatestField()">コピー</button>
+                </div>
+            </div>
+            <div style="overflow:auto;">
+                <table class="stats-table" style="font-size: 12px; min-width: 720px;">
+                    <thead>
+                        <tr>
+                            <th>コード / URL</th>
+                            <th>状態</th>
+                            <th>有効期限</th>
+                            <th>使用者</th>
+                            <th>使用日時</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invite-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="card">
             <h2 class="card-title">データ管理</h2>
             <button class="btn btn-secondary btn-block mb-2" onclick="exportData()">
@@ -832,6 +861,24 @@
         // ES Modules の関数を window に公開（inline onclick から呼べるようにする）
         Object.assign(window, appModule, authModule);
 
+        window.copyInviteFromLatestField = function() {
+            const value = document.getElementById('invite-latest-url').value.trim();
+            if (!value) {
+                alert('先に招待リンクを発行してください');
+                return;
+            }
+            try {
+                const code = new URL(value).searchParams.get('invite');
+                if (!code) {
+                    alert('招待URLが不正です');
+                    return;
+                }
+                window.copyInviteLink(code);
+            } catch (e) {
+                alert('招待URLが不正です');
+            }
+        };
+
         // 移行バナーの操作をwindowに公開
         let _currentTeamId = null;
 
@@ -891,7 +938,9 @@
             'closeGameStatModal', 'saveGameStat', 'deleteGameStatConfirm', 'deleteGameStat',
             'showPlayerStatDetail', 'closePlayerStatModal',
             'closeConfirmModal', 'confirmAction',
-            'saveSettings', 'exportData', 'importData', 'confirmClearData'
+            'saveSettings', 'exportData', 'importData', 'confirmClearData',
+            'createInviteLinkFromAdmin', 'copyInviteLink', 'reissueInviteFromAdmin', 'invalidateInviteFromAdmin',
+            'copyInviteFromLatestField'
         ];
         const _miss = _required.filter(fn => typeof window[fn] !== 'function');
         if (_miss.length) console.error('未登録関数:', _miss);

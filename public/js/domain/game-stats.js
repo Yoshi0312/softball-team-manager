@@ -271,16 +271,22 @@ export function aggregateGamesByPeriod(games, options = {}) {
 }
 
 /**
- * 年度内の月別集計（1〜12月を欠損補完して返す）
+ * 年度内の月別集計を返す（データ0件時は空配列）
  *
  * @param {Array<Object>} games - 試合データ配列
  * @param {Object} [options]
  * @param {number} options.year - 対象年度
  * @param {string} [options.type='all'] - 試合種別
- * @returns {Array<Object>} 12件固定の月別サマリ
+ * @returns {Array<Object>} 月別サマリ配列（データ0件時は[]、それ以外は1〜12月の12件固定）
  */
 export function aggregateMonthlySummary(games, options = {}) {
     const { year, type = 'all' } = options;
+    const filtered = filterGames(games, { year, type });
+
+    if (filtered.length === 0) {
+        return [];
+    }
+
     const monthly = aggregateGamesByPeriod(games, { year, type, groupBy: 'month' });
     const map = new Map(monthly.map(m => [m.month, m]));
 
@@ -313,16 +319,35 @@ export function aggregateMonthlySummary(games, options = {}) {
  * @param {Array<Object>} games - 試合データ配列
  * @param {Object} [options]
  * @param {number} [options.year] - 対象年度（省略時は全年度）
- * @param {string} [options.gameType='all'] - 試合種別フィルタ
+ * @param {string} [options.type='all'] - 試合種別フィルタ（後方互換でgameTypeも受け付ける）
  * @returns {Object} グラフ描画に使える固定フォーマットの時系列データ
  */
 export function buildGameTrendData(games, options = {}) {
-    const { year, gameType = 'all' } = options;
-    const filtered = filterGames(games, { year, type: gameType })
+    const { year, type = options.gameType ?? 'all' } = options;
+    const filtered = filterGames(games, { year, type })
         .filter(g => g.date)
         .map(g => ({ ...g, __date: new Date(g.date) }))
         .filter(g => !Number.isNaN(g.__date.getTime()))
         .sort((a, b) => a.__date - b.__date);
+
+    if (filtered.length === 0) {
+        return {
+            filters: {
+                year: year ?? null,
+                type
+            },
+            monthly: [],
+            perGame: [],
+            series: {
+                monthlyWinRate: [],
+                monthlyRunDiff: [],
+                gameWinRate: [],
+                gameRunDiff: [],
+                cumulativeWins: [],
+                cumulativeLosses: []
+            }
+        };
+    }
 
     const monthlyMap = new Map();
     let cumulativeWins = 0;
@@ -348,7 +373,9 @@ export function buildGameTrendData(games, options = {}) {
         }
 
         const totalGames = index + 1;
+        // 勝率 = (勝利数 + 0.5 × 引き分け数) / 試合数
         const winRate = (cumulativeWins + cumulativeDraws * 0.5) / totalGames;
+        // 得失点差 = 自チーム得点 - 相手チーム得点（引き分け時は0）
         const runDiff = our - opp;
 
         if (!monthlyMap.has(monthKey)) {
@@ -379,6 +406,7 @@ export function buildGameTrendData(games, options = {}) {
         if (result === 'win') monthData.wins++;
         else if (result === 'loss') monthData.losses++;
         else monthData.draws++;
+        // 月次勝率 = (月次勝利数 + 0.5 × 月次引き分け数) / 月次試合数
         monthData.winRate = (monthData.wins + monthData.draws * 0.5) / monthData.games;
         monthData.cumulativeWins = cumulativeWins;
         monthData.cumulativeLosses = cumulativeLosses;
@@ -406,7 +434,7 @@ export function buildGameTrendData(games, options = {}) {
     return {
         filters: {
             year: year ?? null,
-            gameType
+            type
         },
         monthly,
         perGame,

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { globSync } from 'node:fs';
 
 const repoRoot = resolve(process.cwd());
 const appJsPath = resolve(repoRoot, 'public/js/app.js');
@@ -8,6 +9,8 @@ const htmlPath = resolve(repoRoot, 'public/index.html');
 
 const appCode = readFileSync(appJsPath, 'utf8');
 const html = readFileSync(htmlPath, 'utf8');
+const jsTemplateSources = globSync('public/js/**/*.js', { cwd: repoRoot })
+    .map(path => ({ path, code: readFileSync(resolve(repoRoot, path), 'utf8') }));
 
 const NON_APP_ONCLICK_FUNCTIONS = new Set([
     'switchTeam',
@@ -46,11 +49,11 @@ function getExportedNames(code) {
     return names;
 }
 
-function getOnclickFunctionNames(htmlCode) {
-    const onclickRegex = /onclick\s*=\s*"([^"]*)"/g;
+function getInlineHandlerFunctionNames(sourceCode) {
+    const onclickRegex = /on(?:click|change)\s*=\s*"([^"]*)"/g;
     const fnNames = new Set();
 
-    for (const m of htmlCode.matchAll(onclickRegex)) {
+    for (const m of sourceCode.matchAll(onclickRegex)) {
         const expr = m[1];
         const callRegex = /([A-Za-z_$][\w$]*)\s*\(/g;
         let fn;
@@ -68,7 +71,10 @@ function getOnclickFunctionNames(htmlCode) {
 }
 
 const appExports = getExportedNames(appCode);
-const onclickFns = getOnclickFunctionNames(html);
+const onclickFns = new Set([
+    ...getInlineHandlerFunctionNames(html),
+    ...jsTemplateSources.flatMap(({ code }) => [...getInlineHandlerFunctionNames(code)])
+]);
 
 const onclickExpectedFromApp = [...onclickFns]
     .filter(name => !NON_APP_ONCLICK_FUNCTIONS.has(name))

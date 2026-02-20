@@ -6,6 +6,7 @@ import { POSITIONS, FIELD_POSITIONS } from '../../constants.js';
 import * as DB from '../../db.js';
 import { generateId, getPositionFit, getBattingLabel } from '../../domain/game-utils.js';
 import { showConfirm } from '../modals/confirmModal.js';
+import { alertFirestoreWriteError } from '../alerts.js';
 import { renderSavedList } from './saved.js';
 
 /** 新規メンバー表を初期化 */
@@ -220,8 +221,7 @@ export async function saveLineup(isTemplate = false) {
 
         alert(isTemplate ? 'テンプレートを保存しました' : 'メンバー表を保存しました');
     } catch (e) {
-        console.error('メンバー表保存エラー:', e);
-        alert('保存に失敗しました: ' + e.message);
+        alertFirestoreWriteError('メンバー表保存エラー', e);
     }
 }
 
@@ -264,8 +264,7 @@ export function deleteLineup(lineupId, isTemplate = false) {
             }
             renderSavedList();
         } catch (e) {
-            console.error('メンバー表削除エラー:', e);
-            alert('削除に失敗しました: ' + e.message);
+            alertFirestoreWriteError('メンバー表削除エラー', e);
         }
     });
 }

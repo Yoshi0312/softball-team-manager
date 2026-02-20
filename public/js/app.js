@@ -44,7 +44,7 @@ import { renderAccountingPage, changeAccountingMonth, saveAccountingEntry, delet
 import {
     renderStatsPage, updateYearSelector, changeStatsYear, changeStatsGameType,
     switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy, togglePlayerCompare,
-    changeMvpVoteEvent, submitMvpVote, saveMvpVoteSettings, renderMvpVotingSection
+    changeMvpVoteEvent, submitMvpVote, saveMvpVoteSettings, renderMvpVotingSection, changeOpponentFilter
 } from './ui/pages/stats.js';
 
 // modals
@@ -150,7 +150,7 @@ export {
     // stats
     renderStatsPage, updateYearSelector, changeStatsYear, changeStatsGameType,
     switchStatsTab, renderTeamSummary, renderGameStatsList, renderPlayerStats, changeStatsSortBy, togglePlayerCompare,
-    changeMvpVoteEvent, submitMvpVote, saveMvpVoteSettings, renderMvpVotingSection,
+    changeMvpVoteEvent, submitMvpVote, saveMvpVoteSettings, renderMvpVotingSection, changeOpponentFilter,
     // gameStatModal
     openLineupSelectModal, closeLineupSelectModal,
     openGameStatFromLineup, openGameStatModal,

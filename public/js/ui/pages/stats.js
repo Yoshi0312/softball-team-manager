@@ -10,6 +10,7 @@ import {
     filterGames,
     calculatePlayerStats as calcStats,
     calculateTeamSummary,
+    calculateOpponentSummary,
     getAvailableYears,
     aggregateMonthlySummary,
     buildGameTrendData
@@ -19,6 +20,8 @@ import { resolveGameType, formatAvg, formatPercent } from '../../domain/game-uti
 const MAX_COMPARE_PLAYERS = 3;
 const STAT_FALLBACK_TEXT = '—';
 const UNAVAILABLE_TEXT = '表示できません';
+const EMPTY_STATS_TITLE = '表示できる成績データがありません';
+const EMPTY_STATS_DESCRIPTION = '年度・種別を変更するか、試合成績を入力してください。';
 
 function isFiniteNumber(value) {
     return typeof value === 'number' && Number.isFinite(value);
@@ -46,7 +49,15 @@ const PLAYER_COMPARE_METRICS = [
 
 
 let selectedVoteEventId = null;
+let selectedOpponentFilter = 'all';
 const mvpVoteCache = {};
+
+function buildStatsEmptyDescription() {
+    const selectedTypeLabel = state.selectedGameType === 'all'
+        ? '全ての種別'
+        : ((GAME_TYPES[state.selectedGameType] || {}).label || '選択種別');
+    return `${state.selectedYear}年 / ${selectedTypeLabel} の条件では試合成績が0件です。${EMPTY_STATS_DESCRIPTION}`;
+}
 
 function sortVoteEvents(events) {
     return [...(events || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -331,6 +342,8 @@ export function renderTeamSummary() {
     const emptyContainer = document.getElementById('dashboard-empty');
     const emptyTitle = document.getElementById('dashboard-empty-title');
     const emptyDescription = document.getElementById('dashboard-empty-description');
+    const opponentFilter = document.getElementById('stats-opponent-filter');
+    const opponentContainer = document.getElementById('stats-opponent-analysis-container');
     const summaries = calculateTeamSummary(state.gameStats, { year: state.selectedYear });
     const trendData = buildGameTrendData(state.gameStats, {
         year: state.selectedYear,
@@ -378,22 +391,22 @@ export function renderTeamSummary() {
 
     if (!trendContainer || !runDiffContainer || !monthlyContainer) return;
 
-    const selectedTypeLabel = state.selectedGameType === 'all'
-        ? '全ての種別'
-        : ((GAME_TYPES[state.selectedGameType] || {}).label || '選択種別');
-
     if (filteredGames.length === 0) {
         if (emptyContainer) emptyContainer.style.display = 'block';
         if (chartPanels) chartPanels.style.display = 'none';
         if (emptyTitle) {
-            emptyTitle.textContent = '表示できる成績データがありません';
+            emptyTitle.textContent = EMPTY_STATS_TITLE;
         }
         if (emptyDescription) {
-            emptyDescription.textContent = `${state.selectedYear}年 / ${selectedTypeLabel} の条件では試合成績が0件です。年度・種別を変更するか、試合成績を入力してください。`;
+            emptyDescription.textContent = buildStatsEmptyDescription();
         }
         trendContainer.innerHTML = '';
         runDiffContainer.innerHTML = '';
         monthlyContainer.innerHTML = '';
+        if (opponentFilter) opponentFilter.innerHTML = '<option value="all">全ての対戦相手</option>';
+        if (opponentContainer) {
+            opponentContainer.innerHTML = `<p class="text-muted" style="padding:12px;">${buildStatsEmptyDescription()}</p>`;
+        }
         return;
     }
 
@@ -413,6 +426,60 @@ export function renderTeamSummary() {
     monthlyContainer.innerHTML = monthlySeries.length > 0
         ? renderMonthlyBarChartSvg(monthlySeries)
         : '<p class="text-muted" style="font-size:12px;">月別成績を表示するデータがありません。</p>';
+
+    renderOpponentAnalysis();
+}
+
+function renderOpponentAnalysis() {
+    const filterSelect = document.getElementById('stats-opponent-filter');
+    const container = document.getElementById('stats-opponent-analysis-container');
+    if (!filterSelect || !container) return;
+
+    const rows = calculateOpponentSummary(state.gameStats, {
+        year: state.selectedYear,
+        type: state.selectedGameType
+    }).sort((a, b) => b.winRate - a.winRate || b.count - a.count || b.diff - a.diff || a.opponent.localeCompare(b.opponent));
+
+    const options = ['all', ...rows.map(r => r.opponent)];
+    if (!options.includes(selectedOpponentFilter)) {
+        selectedOpponentFilter = 'all';
+    }
+    filterSelect.innerHTML = options.map(opponent => `<option value="${opponent}" ${opponent === selectedOpponentFilter ? 'selected' : ''}>${opponent === 'all' ? '全ての対戦相手' : opponent}</option>`).join('');
+
+    if (rows.length === 0) {
+        container.innerHTML = `<p class="text-muted" style="padding:12px;">${buildStatsEmptyDescription()}</p>`;
+        return;
+    }
+
+    const visibleRows = selectedOpponentFilter === 'all'
+        ? rows
+        : rows.filter(r => r.opponent === selectedOpponentFilter);
+
+    container.innerHTML = `
+        <div style="overflow-x:auto;">
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>順位</th><th>対戦相手</th><th>試合</th><th>勝</th><th>敗</th><th>分</th><th>得点</th><th>失点</th><th>差</th><th>勝率</th><th>平均得点</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${visibleRows.map(row => {
+                        const rank = rows.findIndex(r => r.opponent === row.opponent) + 1;
+                        return `<tr>
+                            <td>${rank}</td><td>${row.opponent}</td><td>${row.count}</td><td>${row.wins}</td><td>${row.losses}</td><td>${row.draws}</td>
+                            <td>${row.scored}</td><td>${row.conceded}</td><td>${row.diff >= 0 ? '+' : ''}${row.diff}</td><td>${row.winRate.toFixed(3)}</td><td>${row.avgScored.toFixed(2)}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+export function changeOpponentFilter(opponent) {
+    selectedOpponentFilter = opponent || 'all';
+    renderOpponentAnalysis();
 }
 
 /** 試合一覧を描画 */
@@ -427,6 +494,10 @@ export function renderGameStatsList() {
 
     if (filtered.length === 0) {
         container.innerHTML = '';
+        const title = empty.querySelector('p');
+        const desc = empty.querySelector('.text-muted');
+        if (title) title.textContent = EMPTY_STATS_TITLE;
+        if (desc) desc.textContent = buildStatsEmptyDescription();
         empty.style.display = 'block';
         return;
     }
@@ -477,8 +548,9 @@ export function renderPlayerStats() {
       .sort((a, b) => b.stats[sortKey] - a.stats[sortKey]);
 
     if (playerStats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
-        detailBody.innerHTML = '<tr><td colspan="12" class="text-muted" style="padding: 20px;">データがありません</td></tr>';
+        const emptyText = buildStatsEmptyDescription();
+        tbody.innerHTML = `<tr><td colspan="9" class="text-muted" style="padding: 20px;">${emptyText}</td></tr>`;
+        detailBody.innerHTML = `<tr><td colspan="12" class="text-muted" style="padding: 20px;">${emptyText}</td></tr>`;
         const compareContainer = document.getElementById('player-compare-container');
         if (compareContainer) compareContainer.innerHTML = '';
         return;

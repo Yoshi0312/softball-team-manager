@@ -306,3 +306,117 @@ export function aggregateMonthlySummary(games, options = {}) {
         };
     });
 }
+
+/**
+ * 勝率/得失点差/累積勝敗の時系列データを返す
+ *
+ * @param {Array<Object>} games - 試合データ配列
+ * @param {Object} [options]
+ * @param {number} [options.year] - 対象年度（省略時は全年度）
+ * @param {string} [options.gameType='all'] - 試合種別フィルタ
+ * @returns {Object} グラフ描画に使える固定フォーマットの時系列データ
+ */
+export function buildGameTrendData(games, options = {}) {
+    const { year, gameType = 'all' } = options;
+    const filtered = filterGames(games, { year, type: gameType })
+        .filter(g => g.date)
+        .map(g => ({ ...g, __date: new Date(g.date) }))
+        .filter(g => !Number.isNaN(g.__date.getTime()))
+        .sort((a, b) => a.__date - b.__date);
+
+    const monthlyMap = new Map();
+    let cumulativeWins = 0;
+    let cumulativeLosses = 0;
+    let cumulativeDraws = 0;
+
+    const perGame = filtered.map((game, index) => {
+        const yearLabel = game.__date.getFullYear();
+        const month = game.__date.getMonth() + 1;
+        const monthKey = `${yearLabel}-${String(month).padStart(2, '0')}`;
+        const our = game.ourScore || 0;
+        const opp = game.opponentScore || 0;
+
+        let result = 'draw';
+        if (our > opp) {
+            result = 'win';
+            cumulativeWins++;
+        } else if (our < opp) {
+            result = 'loss';
+            cumulativeLosses++;
+        } else {
+            cumulativeDraws++;
+        }
+
+        const totalGames = index + 1;
+        const winRate = (cumulativeWins + cumulativeDraws * 0.5) / totalGames;
+        const runDiff = our - opp;
+
+        if (!monthlyMap.has(monthKey)) {
+            monthlyMap.set(monthKey, {
+                key: monthKey,
+                year: yearLabel,
+                month,
+                label: `${month}月`,
+                games: 0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                scored: 0,
+                conceded: 0,
+                runDiff: 0,
+                winRate: 0,
+                cumulativeWins: 0,
+                cumulativeLosses: 0,
+                cumulativeDraws: 0
+            });
+        }
+
+        const monthData = monthlyMap.get(monthKey);
+        monthData.games++;
+        monthData.scored += our;
+        monthData.conceded += opp;
+        monthData.runDiff = monthData.scored - monthData.conceded;
+        if (result === 'win') monthData.wins++;
+        else if (result === 'loss') monthData.losses++;
+        else monthData.draws++;
+        monthData.winRate = (monthData.wins + monthData.draws * 0.5) / monthData.games;
+        monthData.cumulativeWins = cumulativeWins;
+        monthData.cumulativeLosses = cumulativeLosses;
+        monthData.cumulativeDraws = cumulativeDraws;
+
+        return {
+            key: game.id || `${game.date}-${index}`,
+            gameId: game.id || null,
+            date: game.date,
+            label: `${month}/${game.__date.getDate()}`,
+            gameIndex: totalGames,
+            ourScore: our,
+            opponentScore: opp,
+            result,
+            runDiff,
+            winRate,
+            cumulativeWins,
+            cumulativeLosses,
+            cumulativeDraws
+        };
+    });
+
+    const monthly = Array.from(monthlyMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+
+    return {
+        filters: {
+            year: year ?? null,
+            gameType
+        },
+        monthly,
+        perGame,
+        series: {
+            monthlyWinRate: monthly.map(m => ({ label: m.label, value: m.winRate })),
+            monthlyRunDiff: monthly.map(m => ({ label: m.label, value: m.runDiff })),
+            gameWinRate: perGame.map(g => ({ label: g.label, value: g.winRate })),
+            gameRunDiff: perGame.map(g => ({ label: g.label, value: g.runDiff })),
+            cumulativeWins: perGame.map(g => ({ label: g.label, value: g.cumulativeWins })),
+            cumulativeLosses: perGame.map(g => ({ label: g.label, value: g.cumulativeLosses }))
+        }
+    };
+}

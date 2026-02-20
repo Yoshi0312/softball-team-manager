@@ -28,7 +28,7 @@ import { showPage as showPageRaw, openSettings } from './app/router.js';
 import { updateHomePage } from './ui/pages/home.js';
 import {
     renderAttendancePage, selectAttendanceEvent, saveMyAttendance, editAttendanceEvent,
-    resetAttendanceEventForm, saveAttendanceEvent
+    resetAttendanceEventForm, saveAttendanceEvent, getLatestAttendanceSummary
 } from './ui/pages/attendance.js';
 import { renderPlayerList, openPlayerModal, closePlayerModal, savePlayer, deletePlayer } from './ui/pages/players.js';
 import {
@@ -128,7 +128,7 @@ export {
     // home
     updateHomePage,
     renderAttendancePage, selectAttendanceEvent, saveMyAttendance, editAttendanceEvent,
-    resetAttendanceEventForm, saveAttendanceEvent,
+    resetAttendanceEventForm, saveAttendanceEvent, getLatestAttendanceSummary,
     // players
     renderPlayerList, openPlayerModal, closePlayerModal, savePlayer, deletePlayer,
     // lineup

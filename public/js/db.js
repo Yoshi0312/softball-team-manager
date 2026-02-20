@@ -114,6 +114,11 @@ export async function getEvents(teamId) {
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+// イベント一覧を取得（attendance向け最小API alias）
+export async function listEvents(teamId) {
+    return getEvents(teamId);
+}
+
 // イベントを追加
 export async function addEvent(teamId, eventData) {
     const ref = collection(db, 'teams', teamId, 'events');
@@ -123,6 +128,11 @@ export async function addEvent(teamId, eventData) {
         updatedAt: serverTimestamp()
     });
     return docRef.id;
+}
+
+// イベントを作成（attendance向け最小API alias）
+export async function createEvent(teamId, eventData) {
+    return addEvent(teamId, eventData);
 }
 
 // イベントを更新
@@ -143,11 +153,21 @@ export async function saveAttendance(teamId, eventId, userId, attendanceData) {
     }, { merge: true });
 }
 
+// 出欠回答を保存（attendance向け最小API alias）
+export async function saveAttendanceResponse(teamId, eventId, userId, attendanceData) {
+    return saveAttendance(teamId, eventId, userId, attendanceData);
+}
+
 // イベントの出欠回答一覧を取得
 export async function getAttendancesByEvent(teamId, eventId) {
     const ref = collection(db, 'teams', teamId, 'events', eventId, 'attendances');
     const snapshot = await getDocs(ref);
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// 回答一覧を取得（attendance向け最小API alias）
+export async function listAttendances(teamId, eventId) {
+    return getAttendancesByEvent(teamId, eventId);
 }
 
 // チームメンバー一覧を取得

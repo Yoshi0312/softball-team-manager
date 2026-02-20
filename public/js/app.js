@@ -24,6 +24,10 @@ import { showPage as showPageRaw, openSettings } from './app/router.js';
 
 // pages
 import { updateHomePage } from './ui/pages/home.js';
+import {
+    renderAttendancePage, selectAttendanceEvent, saveMyAttendance, editAttendanceEvent,
+    resetAttendanceEventForm, saveAttendanceEvent
+} from './ui/pages/attendance.js';
 import { renderPlayerList, openPlayerModal, closePlayerModal, savePlayer, deletePlayer } from './ui/pages/players.js';
 import {
     startNewLineup, renderLineupForm, renderLineupTable,
@@ -65,6 +69,7 @@ function showPageWithRender(pageId) {
     // ページに合わせてコンテンツ更新
     if (pageId === 'home') updateHomePage();
     if (pageId === 'players') renderPlayerList();
+    if (pageId === 'attendance') renderAttendancePage();
     if (pageId === 'stats') renderStatsPage();
     if (pageId === 'saved') renderSavedList();
     if (pageId === 'settings') loadSettings();
@@ -80,12 +85,16 @@ export async function loadData() {
         state.lineups = data.lineups || [];
         state.templates = data.templates || [];
         state.gameStats = data.gameStats || [];
+        state.events = data.events || [];
+        state.teamMembers = data.teamMembers || [];
         state.settings = data.settings || state.settings;
         console.log('Firestoreからデータ読み込み完了:', {
             players: state.players.length,
             lineups: state.lineups.length,
             templates: state.templates.length,
-            gameStats: state.gameStats.length
+            gameStats: state.gameStats.length,
+            events: state.events.length,
+            teamMembers: state.teamMembers.length
         });
     } catch (e) {
         console.error('Firestoreデータ読み込みエラー:', e);
@@ -113,6 +122,8 @@ export {
     openSettings,
     // home
     updateHomePage,
+    renderAttendancePage, selectAttendanceEvent, saveMyAttendance, editAttendanceEvent,
+    resetAttendanceEventForm, saveAttendanceEvent,
     // players
     renderPlayerList, openPlayerModal, closePlayerModal, savePlayer, deletePlayer,
     // lineup

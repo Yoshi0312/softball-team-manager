@@ -1,0 +1,24 @@
+{
+  "name": "ソフトボール メンバー表管理",
+  "short_name": "メンバー表管理",
+  "description": "ソフトボールチームのメンバー表・出欠・成績を管理するアプリ",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#1a73e8",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/app-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
